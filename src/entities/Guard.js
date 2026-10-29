@@ -1,521 +1,298 @@
-import Phaser from 'phaser';
-import { audioSystem } from '../systems/Audio.js';
+// src/entities/Guard.js
+// Kestrel PMC Guard entity with 2.5D vision cone, flashlight, telegraph laser & recursion protection
 
-export class Guard extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y, config = {}) {
-    super(scene, x, y, 'guard', 0);
-    scene.add.existing(this);
-    scene.physics.add.existing(this);
+import * as THREE from 'three';
+import { collision } from '../world/Collision.js';
+import { audio } from '../core/Audio.js';
+import { events } from '../core/Events.js';
 
-    // Hitbox: 14x34 in 28x40 frame
-    this.body.setSize(14, 34);
-    this.body.setOffset(7, 6);
-    this.body.setGravityY(900);
-    this.setDepth(90);
+export class Guard {
+  constructor(scene, x, y, patrolMinX, patrolMaxX, alarmSystem) {
+    this.scene = scene;
+    this.x = x;
+    this.y = y;
+    this.patrolMinX = patrolMinX;
+    this.patrolMaxX = patrolMaxX;
+    this.alarmSystem = alarmSystem;
 
-    // Guard Type: 'dock', 'office', 'heavy'
-    this.guardType = config.guardType || (config.isOffice ? 'office' : 'dock');
-    this.isSleeping = config.isSleeping || false;
-    this.patrolLeftX = config.patrolLeftX !== undefined ? config.patrolLeftX : x - 60;
-    this.patrolRightX = config.patrolRightX !== undefined ? config.patrolRightX : x + 60;
-    this.facing = config.facing || 1;
-    this.setFlipX(this.facing === -1);
+    this.vx = 0;
+    this.facing = 1;
+    this.box = { x: x - 0.25, y: y, w: 0.5, h: 1.7 };
 
-    // Stats
-    this.hp = this.guardType === 'heavy' ? 80 : 40;
-    this.maxHp = this.hp;
+    // AI state: 'patrol', 'suspicious', 'investigate', 'alert', 'combat', 'knocked'
+    this.state = 'patrol';
+    this.patrolSpeed = 1.4;
+    this.combatSpeed = 3.2;
+    this.investigateTimer = 0;
+    this.lastKnownX = 0;
+    this.lastKnownY = 0;
 
-    // States: 'patrol', 'wait', 'suspicious', 'search', 'alert', 'stunned', 'knocked', 'grabbed', 'dead'
-    this.state = this.isSleeping ? 'sleeping' : 'patrol';
-    this.isKnockedOut = false;
-    this.isDead = false;
-    this.isAlert = false;
-    this.bodyDiscovered = false;
-    this.looted = false;
+    // Vision cone & spotting
+    this.visionAngle = (70 * Math.PI) / 180;
+    this.visionRange = 12.0; // 12m in light, drops in shadow
+    this.spotMeter = 0; // 0 to 1
+    this.spottedSlowMoTriggered = false;
 
-    // AI Speeds
-    this.patrolSpeed = this.guardType === 'heavy' ? 28 : 36;
-    this.alertSpeed = this.guardType === 'heavy' ? 55 : 72;
-
-    // Timers
-    this.waitTimer = 0;
-    this.suspiciousTimer = 0;
-    this.searchTimer = 0;
-    this.stunTimer = 0;
+    // Combat shooting & telegraph (§6.4)
     this.telegraphTimer = 0;
     this.shootCooldown = 0;
-    this.isTelegraphing = false;
 
-    // Vision cone
-    this.visionAngle = 70;
-    this.visionRange = 130;
-    this.detectionLevel = 0;
-    this.flashlightActive = this.guardType !== 'office';
+    // 3D Model
+    this.mesh = this.buildGuardModel();
+    this.scene.add(this.mesh);
 
-    // Target position for investigation
-    this.investigateX = x;
-    this.investigateY = y;
+    // Flashlight SpotLight & Volumetric Cone
+    this.setupFlashlight();
 
-    // Visual indicators: grey "?", orange "?", red "!"
-    this.statusBubble = scene.add.text(x, y - 26, '', {
-      fontFamily: 'Rajdhani, sans-serif',
-      fontSize: '15px',
-      fontStyle: 'bold',
-      color: '#94a3b8'
-    }).setOrigin(0.5).setDepth(200);
-
-    // Vision cone & weapon telegraph laser line graphics
-    this.coneGraphics = scene.add.graphics().setDepth(50);
-    this.telegraphGraphics = scene.add.graphics().setDepth(155);
-
-    this.createAnimations();
-    this.initAnim();
+    // Red Telegraph Laser Sight (0.6s before shooting)
+    this.telegraphLaser = this.buildTelegraphLaser();
+    this.scene.add(this.telegraphLaser);
   }
 
-  initAnim() {
-    if (this.isSleeping) {
-      this.setFrame(16);
-    } else {
-      const baseFrame = this.guardType === 'heavy' ? 32 : (this.guardType === 'office' ? 16 : 0);
-      this.setFrame(baseFrame);
-    }
+  buildGuardModel() {
+    const root = new THREE.Group();
+
+    const ponchoMat = new THREE.MeshStandardMaterial({ color: 0x3b4a24, roughness: 0.8 }); // Kestrel Olive
+    const armorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x9a5b32, roughness: 0.8 });
+    const helmetMat = new THREE.MeshStandardMaterial({ color: 0x242e16, roughness: 0.4 });
+
+    // Torso with Olive Poncho
+    const torsoGeo = new THREE.BoxGeometry(0.4, 0.6, 0.26);
+    const torso = new THREE.Mesh(torsoGeo, ponchoMat);
+    torso.position.y = 1.05;
+    torso.castShadow = true;
+    root.add(torso);
+
+    // Head & Tactical Helmet
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 1.48, 0);
+    const headGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+    const head = new THREE.Mesh(headGeo, skinMat);
+    headGroup.add(head);
+
+    const helmetGeo = new THREE.BoxGeometry(0.26, 0.16, 0.26);
+    const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+    helmet.position.y = 0.08;
+    headGroup.add(helmet);
+    root.add(headGroup);
+
+    // Legs
+    this.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.72, 0.14), armorMat);
+    this.rightLeg.position.set(0.12, 0.38, 0);
+    root.add(this.rightLeg);
+
+    this.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.72, 0.14), armorMat);
+    this.leftLeg.position.set(-0.12, 0.38, 0);
+    root.add(this.leftLeg);
+
+    // Flashlight Arm & SMG
+    this.rightArm = new THREE.Group();
+    this.rightArm.position.set(0.24, 1.25, 0);
+    const armMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.45, 0.1), ponchoMat);
+    armMesh.position.y = -0.18;
+    this.rightArm.add(armMesh);
+
+    // SMG model
+    const smgMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.35), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+    smgMesh.position.set(0, -0.38, 0.15);
+    this.rightArm.add(smgMesh);
+    root.add(this.rightArm);
+
+    this.animTime = 0;
+    return root;
   }
 
-  createAnimations() {
-    const anims = this.scene.anims;
-    if (anims.exists('dock_walk')) return;
+  setupFlashlight() {
+    this.flashlight = new THREE.SpotLight(0xfffbeb, 3.2, 14, Math.PI / 5, 0.5, 1.2);
+    this.flashlight.position.set(0.24, 1.1, 0.3);
+    this.flashlightTarget = new THREE.Object3D();
+    this.flashlightTarget.position.set(5, 1.1, 0);
+    this.mesh.add(this.flashlight);
+    this.mesh.add(this.flashlightTarget);
+    this.flashlight.target = this.flashlightTarget;
 
-    anims.create({
-      key: 'dock_walk',
-      frames: anims.generateFrameNumbers('guard', { start: 0, end: 7 }),
-      frameRate: 7,
-      repeat: -1
+    // Volumetric flashlight cone
+    const coneGeo = new THREE.ConeGeometry(2.8, 8, 16, 1, true);
+    coneGeo.translate(0, -4, 0);
+    coneGeo.rotateX(-Math.PI / 2);
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: 0xfffbeb,
+      transparent: true,
+      opacity: 0.08,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
     });
+    this.flashCone = new THREE.Mesh(coneGeo, coneMat);
+    this.flashCone.position.set(0.24, 1.1, 0.3);
+    this.mesh.add(this.flashCone);
+  }
 
-    anims.create({
-      key: 'dock_alert',
-      frames: anims.generateFrameNumbers('guard', { start: 8, end: 15 }),
-      frameRate: 8,
-      repeat: -1
+  buildTelegraphLaser() {
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(1, 0, 0)
+    ]);
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xff0000,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.8
     });
-
-    anims.create({
-      key: 'office_walk',
-      frames: anims.generateFrameNumbers('guard', { start: 16, end: 23 }),
-      frameRate: 7,
-      repeat: -1
-    });
-
-    anims.create({
-      key: 'office_alert',
-      frames: anims.generateFrameNumbers('guard', { start: 24, end: 31 }),
-      frameRate: 8,
-      repeat: -1
-    });
-
-    anims.create({
-      key: 'heavy_walk',
-      frames: anims.generateFrameNumbers('guard', { start: 32, end: 39 }),
-      frameRate: 6,
-      repeat: -1
-    });
-
-    anims.create({
-      key: 'heavy_alert',
-      frames: anims.generateFrameNumbers('guard', { start: 40, end: 47 }),
-      frameRate: 7,
-      repeat: -1
-    });
+    const line = new THREE.Line(geo, mat);
+    line.visible = false;
+    return line;
   }
 
-  update(time, delta) {
-    const dt = delta / 1000;
-
-    this.statusBubble.setPosition(this.x, this.y - 24);
-
-    if (this.isKnockedOut || this.isDead || this.state === 'grabbed') {
-      this.coneGraphics.clear();
-      this.telegraphGraphics.clear();
-      return;
-    }
-
-    if (this.state === 'stunned') {
-      this.coneGraphics.clear();
-      this.telegraphGraphics.clear();
-      this.stunTimer -= dt;
-      if (this.stunTimer <= 0) {
-        this.state = 'search';
-        this.statusBubble.setText('?').setColor('#f59e0b');
-      }
-      return;
-    }
-
-    if (this.isSleeping) {
-      this.coneGraphics.clear();
-      return;
-    }
-
-    // Vision raycast & player detection
-    this.updateVision(dt);
-
-    // AI state machine
-    switch (this.state) {
-      case 'patrol':
-        this.updatePatrol(dt);
-        break;
-      case 'wait':
-        this.updateWait(dt);
-        break;
-      case 'suspicious':
-        this.updateSuspicious(dt);
-        break;
-      case 'search':
-        this.updateSearch(dt);
-        break;
-      case 'alert':
-        this.updateAlert(dt);
-        break;
-    }
-  }
-
-  // ==========================================
-  // VISION & DETECTION
-  // ==========================================
-  updateVision(dt) {
-    const player = this.scene.player;
-    if (!player || player.state === 'dead') {
-      this.drawVisionCone(false);
-      return;
-    }
-
-    // Overhead pipe hang makes Ghost invisible from below unless guard is alert!
-    if (player.state === 'pipe_hang' && this.state !== 'alert') {
-      this.detectionLevel = Math.max(0, this.detectionLevel - dt);
-      this.drawVisionCone(false);
-      return;
-    }
-
-    const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-    const facingDir = this.flipX ? -1 : 1;
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-
-    const vis = this.scene.stealth?.playerVisibility || 0;
-    const effectiveRange = vis < 30 ? (this.visionRange * 0.5) : this.visionRange;
-
-    const inCone = (dist <= effectiveRange) && (dx * facingDir > 0) && (Math.abs(dy) <= 38);
-
-    if (inCone) {
-      const visRatio = Math.max(0.15, vis / 100);
-      const fillRate = visRatio * 1.5;
-      this.detectionLevel = Math.min(1.0, this.detectionLevel + fillRate * dt);
-
-      if (this.detectionLevel >= 1.0) {
-        this.setAlertState();
-      } else if (this.detectionLevel >= 0.35 && this.state !== 'alert') {
-        this.setSuspiciousState(player.x, player.y);
-      }
-    } else {
-      this.detectionLevel = Math.max(0, this.detectionLevel - dt * 0.5);
-    }
-
-    this.checkBodiesInVision();
-    this.drawVisionCone(inCone || this.state === 'alert');
-  }
-
-  drawVisionCone(hasTarget) {
-    this.coneGraphics.clear();
-    const facingDir = this.flipX ? -1 : 1;
-    const startX = this.x + facingDir * 8;
-    const startY = this.y - 2;
-    const range = (this.scene.stealth?.playerVisibility || 0) < 30 ? (this.visionRange * 0.5) : this.visionRange;
-
-    let coneColor = 0xfef08a;
-    let alpha = 0.16;
-    if (this.state === 'alert') {
-      coneColor = 0xef4444;
-      alpha = 0.32;
-    } else if (this.state === 'suspicious' || this.state === 'search') {
-      coneColor = 0xf59e0b;
-      alpha = 0.24;
-    }
-
-    this.coneGraphics.fillStyle(coneColor, alpha);
-    this.coneGraphics.beginPath();
-    this.coneGraphics.moveTo(startX, startY);
-
-    const baseAngle = facingDir === 1 ? 0 : Math.PI;
-    const spread = (this.visionAngle * Math.PI) / 180 / 2;
-
-    this.coneGraphics.arc(startX, startY, range, baseAngle - spread, baseAngle + spread);
-    this.coneGraphics.closePath();
-    this.coneGraphics.fill();
-  }
-
-  checkBodiesInVision() {
-    if (!this.scene.guards) return;
-    this.scene.guards.getChildren().forEach(other => {
-      if (other !== this && other.isKnockedOut && !other.bodyDiscovered) {
-        const dist = Phaser.Math.Distance.Between(this.x, this.y, other.x, other.y);
-        const facingDir = this.flipX ? -1 : 1;
-        const dx = other.x - this.x;
-        if (dist < 100 && dx * facingDir > 0) {
-          other.bodyDiscovered = true;
-          this.scene.alarm?.raise('Unconscious body discovered', this);
-          this.setAlertState(true);
-        }
-      }
-    });
-  }
-
-  // ==========================================
-  // AI PATROL & STATES
-  // ==========================================
-  updatePatrol(dt) {
-    const facingDir = this.flipX ? -1 : 1;
-    this.body.setVelocityX(facingDir * this.patrolSpeed);
-    this.playAnim('walk');
-
-    if (this.flipX && this.x <= this.patrolLeftX) {
-      this.state = 'wait';
-      this.waitTimer = 1.5;
-      this.body.setVelocityX(0);
-    } else if (!this.flipX && this.x >= this.patrolRightX) {
-      this.state = 'wait';
-      this.waitTimer = 1.5;
-      this.body.setVelocityX(0);
-    }
-  }
-
-  updateWait(dt) {
-    this.waitTimer -= dt;
-    if (this.waitTimer <= 0) {
-      this.setFlipX(!this.flipX);
-      this.state = 'patrol';
-    }
-  }
-
-  hearNoise(nx, ny) {
-    if (this.isSleeping) {
-      this.isSleeping = false;
-    }
-    this.setSuspiciousState(nx, ny);
-  }
-
-  setSuspiciousState(targetX, targetY) {
-    if (this.state === 'alert') return;
-
-    this.state = 'suspicious';
-    this.investigateX = targetX;
-    this.investigateY = targetY;
-    this.suspiciousTimer = 4.0;
-    this.statusBubble.setText('?').setColor('#94a3b8'); // grey '?'
-    audioSystem.setSuspicionState(1);
-    this.setFlipX(targetX < this.x);
-  }
-
-  updateSuspicious(dt) {
-    this.suspiciousTimer -= dt;
-    const dx = this.investigateX - this.x;
-
-    if (Math.abs(dx) > 10) {
-      this.body.setVelocityX(Math.sign(dx) * (this.patrolSpeed * 1.1));
-      this.setFlipX(dx < 0);
-      this.playAnim('walk');
-    } else {
-      this.body.setVelocityX(0);
-    }
-
-    if (this.suspiciousTimer <= 0) {
-      this.state = 'search';
-      this.searchTimer = 15.0;
-      this.statusBubble.setText('?').setColor('#f59e0b'); // orange '?'
-    }
-  }
-
-  updateSearch(dt) {
-    this.searchTimer -= dt;
-    if (Math.floor(this.searchTimer) % 3 === 0) {
-      this.setFlipX(!this.flipX);
-    }
-
-    if (this.searchTimer <= 0) {
-      this.state = 'patrol';
-      this.statusBubble.setText('');
-      audioSystem.setSuspicionState(0);
-    }
-  }
-
+  // RECURSION GUARD: §1 CRITICAL FIX
   setAlertState(fromAlarm = false) {
-    if (this.isKnockedOut || this.isDead) return;
-    if (this.state === 'alert') return;
+    if (this.state === 'alert' || this.state === 'knocked') return;
     this.state = 'alert';
-    this.isAlert = true;
-    if (this.statusBubble) {
-      this.statusBubble.setText('!').setColor('#ef4444'); // red '!'
+
+    // Only raise alarm if not initiated from alarm
+    if (!fromAlarm && this.alarmSystem) {
+      this.alarmSystem.raise(this.x, this.y);
     }
-    audioSystem.setSuspicionState(2);
-    audioSystem.playRadioBlip();
-    if (!fromAlarm) {
-      this.scene.alarm?.raise('Guard spotted Ghost', this);
-    }
-    this.playAnim('alert');
-  }
-
-  // ==========================================
-  // TELEGRAPHED ENEMY WEAPON COMBAT
-  // ==========================================
-  updateAlert(dt) {
-    const player = this.scene.player;
-    if (!player || player.state === 'dead') {
-      this.telegraphGraphics.clear();
-      return;
-    }
-
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    this.setFlipX(dx < 0);
-
-    // Keep distance or pursue
-    const targetDist = this.guardType === 'heavy' ? 80 : 110;
-    if (dist > targetDist) {
-      this.body.setVelocityX(Math.sign(dx) * this.alertSpeed);
-      this.playAnim('alert');
-    } else {
-      this.body.setVelocityX(0);
-      this.playAnim('alert');
-    }
-
-    // Telegraphing with Red Laser Sight (0.6s window before firing!)
-    if (dist < 180 && Math.abs(dy) < 40) {
-      if (!this.isTelegraphing) {
-        this.isTelegraphing = true;
-        this.telegraphTimer = 0.6; // 0.6s telegraph line
-      } else {
-        this.telegraphTimer -= dt;
-        // Draw red laser sight line on the player
-        this.telegraphGraphics.clear();
-        this.telegraphGraphics.lineStyle(1.5, 0xef4444, 0.85);
-        this.telegraphGraphics.lineBetween(this.x + (this.flipX ? -12 : 12), this.y - 4, player.x, player.y);
-
-        if (this.telegraphTimer <= 0) {
-          this.telegraphGraphics.clear();
-          this.isTelegraphing = false;
-          this.executeGuardAttack(player, dist);
-        }
-      }
-    } else {
-      this.telegraphGraphics.clear();
-      this.isTelegraphing = false;
-    }
-  }
-
-  executeGuardAttack(player, dist) {
-    if (this.guardType === 'heavy') {
-      // Shotgun blast (30 damage close / 10 damage far)
-      const dmg = dist < 70 ? 30 : 10;
-      audioSystem.playAlarmSiren();
-      this.scene.cameras.main.shake(150, 0.008);
-      player.takeDamage(dmg, 'heavy shotgun');
-      this.spawnTracer(player.x, player.y, 0xf59e0b, 3);
-    } else if (this.guardType === 'dock') {
-      // 3-round SMG burst (8 damage per bullet)
-      audioSystem.playFootstep(true);
-      for (let b = 0; b < 3; b++) {
-        this.scene.time.delayedCall(b * 100, () => {
-          player.takeDamage(8, 'dock guard SMG');
-          this.spawnTracer(player.x, player.y, 0xfde047, 1.5);
-        });
-      }
-    } else {
-      // Office guard pistol (12 damage)
-      audioSystem.playFootstep(true);
-      player.takeDamage(12, 'office pistol');
-      this.spawnTracer(player.x, player.y, 0xfde047, 1.5);
-    }
-  }
-
-  spawnTracer(tx, ty, color, width) {
-    const line = this.scene.add.line(0, 0, this.x + (this.flipX ? -12 : 12), this.y - 4, tx, ty, color, 0.9)
-      .setLineWidth(width)
-      .setDepth(160);
-    this.scene.tweens.add({
-      targets: line,
-      alpha: 0,
-      duration: 100,
-      onComplete: () => line.destroy()
-    });
-  }
-
-  playAnim(animType) {
-    const key = `${this.guardType}_${animType}`;
-    if (this.anims.exists(key)) {
-      this.play(key, true);
-    }
-  }
-
-  // ==========================================
-  // DAMAGE, HEADSHOTS & KNOCKOUT
-  // ==========================================
-  takeDamage(amount, isHeadshot = false, isSilentPistol = false) {
-    if (this.isKnockedOut || this.isDead) return;
-
-    if (isHeadshot && isSilentPistol) {
-      // Silenced pistol headshot = instant silent takedown!
-      this.knockout();
-      return;
-    }
-
-    const multiplier = isHeadshot ? 2.5 : 1.0;
-    this.hp -= (amount * multiplier);
-
-    this.setTint(0xff2222);
-    this.scene.time.delayedCall(100, () => this.clearTint());
-
-    if (this.hp <= 0) {
-      this.kill();
-    } else {
-      this.setAlertState();
-    }
-  }
-
-  stun(duration = 6.0) {
-    this.state = 'stunned';
-    this.stunTimer = duration;
-    this.body.setVelocity(0, 0);
-    this.statusBubble.setText('⚡').setColor('#38bdf8');
-    this.setTint(0x38bdf8);
-    this.scene.time.delayedCall(200, () => this.clearTint());
   }
 
   knockout() {
-    this.isKnockedOut = true;
+    if (this.state === 'knocked') return;
     this.state = 'knocked';
-    this.body.setVelocity(0, 0);
-    this.statusBubble.setText('zZ').setColor('#94a3b8');
-    this.setFrame(48); // knocked frame
-    this.coneGraphics.clear();
-    this.telegraphGraphics.clear();
+    this.flashlight.intensity = 0;
+    this.flashCone.visible = false;
+    this.telegraphLaser.visible = false;
+
+    // Rotate flat on ground
+    this.mesh.rotation.z = Math.PI / 2;
+    this.mesh.position.y = this.y + 0.2;
+    audio.playTakedown();
+    events.emit('guard_knocked', { x: this.x, y: this.y });
   }
 
-  getGrabbed(player) {
-    this.state = 'grabbed';
-    this.body.setVelocity(0, 0);
-    this.statusBubble.setText('!').setColor('#ef4444');
-    this.coneGraphics.clear();
-    this.telegraphGraphics.clear();
+  update(dt, player) {
+    if (this.state === 'knocked') return;
+    this.animTime += dt;
+    this.shootCooldown -= dt;
+
+    // 1. Vision Check against Player
+    this.checkVision(player, dt);
+
+    // 2. AI State Machine
+    if (this.state === 'patrol') {
+      this.vx = this.facing * this.patrolSpeed;
+      if (this.facing > 0 && this.x >= this.patrolMaxX) {
+        this.facing = -1;
+      } else if (this.facing < 0 && this.x <= this.patrolMinX) {
+        this.facing = 1;
+      }
+    } else if (this.state === 'investigate') {
+      const dx = this.lastKnownX - this.x;
+      if (Math.abs(dx) > 0.4) {
+        this.facing = Math.sign(dx);
+        this.vx = this.facing * this.patrolSpeed;
+      } else {
+        this.vx = 0;
+        this.investigateTimer -= dt;
+        if (this.investigateTimer <= 0) {
+          this.state = 'patrol';
+        }
+      }
+    } else if (this.state === 'alert' || this.state === 'combat') {
+      const dx = player.x - this.x;
+      this.facing = Math.sign(dx) || 1;
+
+      // Close distance or shoot
+      const dist = Math.hypot(dx, player.y - this.y);
+      if (dist > 5.0) {
+        this.vx = this.facing * this.combatSpeed;
+      } else {
+        this.vx = 0;
+      }
+
+      // Telegraph laser before shooting (§6.4: 0.6s red laser)
+      this.updateTelegraphCombat(dt, player);
+    }
+
+    // Apply movement on gameplay plane
+    this.x += this.vx * dt;
+    this.box.x = this.x - 0.25;
+    this.box.y = this.y;
+
+    // Animate legs
+    if (Math.abs(this.vx) > 0.1) {
+      const swing = Math.sin(this.animTime * 10) * 0.5;
+      this.rightLeg.rotation.x = swing;
+      this.leftLeg.rotation.x = -swing;
+    } else {
+      this.rightLeg.rotation.x = 0;
+      this.leftLeg.rotation.x = 0;
+    }
+
+    this.mesh.position.set(this.x, this.y, 0);
+    this.mesh.scale.set(this.facing, 1, 1);
   }
 
-  kill() {
-    this.isDead = true;
-    this.isKnockedOut = true;
-    this.state = 'dead';
-    this.body.setVelocity(0, 0);
-    this.statusBubble.setText('');
-    this.setFrame(48);
-    this.coneGraphics.clear();
-    this.telegraphGraphics.clear();
+  checkVision(player, dt) {
+    if (player.hp <= 0 || player.state === 'pipe_hang') {
+      this.spotMeter = Math.max(0, this.spotMeter - dt * 1.5);
+      return;
+    }
+
+    const dx = player.x - this.x;
+    const dy = (player.y + 1.0) - (this.y + 1.2);
+    const dist = Math.hypot(dx, dy);
+
+    // Is player in front?
+    const inFront = (dx * this.facing) > 0;
+    const effectiveRange = player.visibility < 0.35 ? 6.0 : this.visionRange;
+
+    if (inFront && dist <= effectiveRange) {
+      // Raycast line-of-sight check
+      const cast = collision.raycast(this.x, this.y + 1.2, player.x, player.y + 1.0);
+      if (!cast.hit || cast.fraction > 0.95) {
+        // Spotted! Fill detection bar
+        this.spotMeter += dt * (1.5 / Math.max(1, dist * 0.2));
+        this.lastKnownX = player.x;
+        this.lastKnownY = player.y;
+
+        if (this.spotMeter >= 1.0 && this.state !== 'alert') {
+          // Detection complete! Enter alert state
+          this.setAlertState(false);
+          audio.playAlarmSiren();
+        } else if (this.state === 'patrol') {
+          this.state = 'investigate';
+          this.investigateTimer = 4.0;
+        }
+        return;
+      }
+    }
+
+    // Decay spot meter if not seen
+    this.spotMeter = Math.max(0, this.spotMeter - dt * 1.0);
+  }
+
+  updateTelegraphCombat(dt, player) {
+    this.telegraphLaser.visible = true;
+    this.telegraphTimer += dt;
+
+    // Update laser line from weapon to player
+    const positions = this.telegraphLaser.geometry.attributes.position.array;
+    positions[0] = this.x + this.facing * 0.2;
+    positions[1] = this.y + 1.1;
+    positions[2] = 0.05;
+    positions[3] = player.x;
+    positions[4] = player.y + 1.0;
+    positions[5] = 0.05;
+    this.telegraphLaser.geometry.attributes.position.needsUpdate = true;
+
+    // Shoot after 0.6s telegraph
+    if (this.telegraphTimer >= 0.6 && this.shootCooldown <= 0) {
+      audio.playPistolShot();
+      player.takeDamage(18);
+      this.telegraphTimer = 0;
+      this.shootCooldown = 1.2;
+      this.telegraphLaser.visible = false;
+    }
   }
 }

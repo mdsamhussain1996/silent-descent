@@ -1,0 +1,46 @@
+{
+  "id": "m1_warehouse_slice",
+  "name": "Mission 1: Iron Tide (Warehouse Sector)",
+  "setting": "Kestrel Dynamics Naval Yard — Warehouse 4",
+  "colorGrade": "teal_sodium",
+  "ambientColor": "0x0c1c30",
+  "ambientIntensity": 0.45,
+  "bounds": { "minX": -18, "maxX": 18, "minY": 0, "maxY": 10 },
+  "playerSpawn": { "x": -15.0, "y": 0.0 },
+  "rooms": [
+    {
+      "id": "warehouse_main",
+      "kitPieces": [
+        { "type": "floor", "x": 0, "y": -1, "w": 36, "h": 1, "material": "concrete" },
+        { "type": "catwalk", "x": -8, "y": 3.6, "w": 14, "h": 0.15, "oneWay": true },
+        { "type": "pipe", "x1": -6, "x2": 4, "y": 5.6 },
+        { "type": "crate", "x": -12, "y": 0 },
+        { "type": "crate", "x": -11, "y": 0 },
+        { "type": "crate", "x": -11.5, "y": 1 },
+        { "type": "crate", "x": -1.5, "y": 0 },
+        { "type": "crate", "x": 9.5, "y": 0 }
+      ],
+      "entities": [
+        { "type": "guard", "x": -4.0, "y": 0.0, "patrolMinX": -8.0, "patrolMaxX": 5.0 },
+        { "type": "guard", "x": -1.0, "y": 3.6, "patrolMinX": -7.0, "patrolMaxX": 5.0 },
+        { "type": "camera", "x": 3.5, "y": 6.2 },
+        { "type": "laser", "x": 7.8, "y1": 0.0, "y2": 3.2 },
+        { "type": "terminal", "x": 13.5, "y": 0.0 },
+        { "type": "lamp", "x": -9.0, "y": 6.8, "shootable": true },
+        { "type": "lamp", "x": 0.0, "y": 6.8, "shootable": true },
+        { "type": "lamp", "x": 11.0, "y": 6.8, "shootable": true }
+      ]
+    }
+  ],
+  "objectives": {
+    "primary": [
+      { "id": "infiltrate", "text": "Infiltrate Kestrel Warehouse", "completed": true },
+      { "id": "hack", "text": "Hack Security Terminal", "completed": false },
+      { "id": "secure", "text": "Eliminate Threat & Secure Sector", "completed": false }
+    ],
+    "secondary": [
+      { "id": "no_alarms", "text": "No Alarms Raised", "bonus": 500 },
+      { "id": "no_kills", "text": "Non-Lethal Takedowns Only", "bonus": 500 }
+    ]
+  }
+}

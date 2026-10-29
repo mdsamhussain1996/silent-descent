@@ -1,89 +1,66 @@
-import { audioSystem } from './Audio.js';
+// src/systems/Alarm.js
+// 3-Level Alarm System with Re-entrancy Recursion Guard & Proximity Alerting
+
+import { audio } from '../core/Audio.js';
+import { events } from '../core/Events.js';
 
 export class AlarmSystem {
-  constructor(scene) {
-    this.scene = scene;
-    this.level = 0; // 0, 1, 2, 3
-    this.decayTimer = 0; // 60s to decay 1 level
-    this.totalAlarmsTriggered = 0;
-    this.criticalTimer = 15; // 15s countdown at level 3
-    this.isCritical = false;
-    this.raising = false; // re-entrancy protection
+  constructor(lightingSystem) {
+    this.lighting = lightingSystem;
+    this.level = 0; // 0 = calm, 1 = search, 2 = reinforcements, 3 = lockdown
+    this.calmTimer = 0;
+    this.raising = false; // RE-ENTRANCY RECURSION GUARD (§1)
+    this.guards = [];
   }
 
-  raise(reason = 'detection', source = null) {
-    if (this.raising) return;
+  setGuards(guardsList) {
+    this.guards = guardsList;
+  }
+
+  // Raise alarm level with recursion guard and proximity filtering
+  raise(sourceX = 0, sourceY = 0) {
+    if (this.raising) return; // Prevent infinite re-entrancy
     this.raising = true;
 
     try {
       this.level = Math.min(3, this.level + 1);
-      this.totalAlarmsTriggered++;
-      this.decayTimer = 60; // reset decay timer
+      this.calmTimer = 60.0; // 60s before decaying one level
 
-      audioSystem.playAlarmSiren();
-      audioSystem.setSuspicionState(2);
-
-      if (this.level === 3) {
-        this.isCritical = true;
-        this.criticalTimer = 15;
+      if (this.lighting) {
+        this.lighting.setAlarmState(this.level > 0);
       }
 
-      // Alert nearby guards within ~600 px (or same section)
-      if (this.scene.guards) {
-        const sourceX = source && typeof source.x === 'number' 
-          ? source.x 
-          : (this.scene.player ? this.scene.player.x : 0);
-        this.scene.guards.getChildren().forEach(g => {
-          if (!g.isKnockedOut && !g.isDead) {
-            const dist = Math.abs(g.x - sourceX);
-            if (dist <= 600) {
-              g.setAlertState(true);
-            }
-          }
-        });
-      }
+      audio.playAlarmSiren();
+      events.emit('alarm_raised', { level: this.level, x: sourceX, y: sourceY });
 
-      // Notify HUD
-      if (this.scene.hud) {
-        this.scene.hud.onAlarmChange(this.level, reason);
+      // Alert only guards within ~20m radius (or all if Level 3)
+      const alertRadius = this.level === 3 ? 999 : 20.0;
+      for (let i = 0; i < this.guards.length; i++) {
+        const g = this.guards[i];
+        if (g.state === 'knocked') continue;
+        const dist = Math.hypot(g.x - sourceX, g.y - sourceY);
+        if (dist <= alertRadius) {
+          // Pass fromAlarm = true to prevent re-entering AlarmSystem.raise()
+          g.setAlertState(true);
+        }
       }
     } finally {
       this.raising = false;
     }
   }
 
-  update(delta) {
-    const dt = delta / 1000;
-
-    // Decay when not in critical fail state
-    if (this.level > 0 && this.level < 3) {
-      this.decayTimer -= dt;
-      if (this.decayTimer <= 0) {
+  update(dt) {
+    if (this.level > 0) {
+      this.calmTimer -= dt;
+      if (this.calmTimer <= 0) {
         this.level = Math.max(0, this.level - 1);
-        this.decayTimer = 60;
-        if (this.level === 0) {
-          audioSystem.setSuspicionState(0);
+        if (this.level > 0) {
+          this.calmTimer = 60.0;
+        } else if (this.lighting) {
+          this.lighting.setAlarmState(false);
         }
-        if (this.scene.hud) {
-          this.scene.hud.onAlarmChange(this.level, 'decayed');
-        }
+        events.emit('alarm_decayed', { level: this.level });
       }
     }
-
-    // Level 3 critical countdown
-    if (this.isCritical) {
-      this.criticalTimer -= dt;
-      if (this.criticalTimer <= 0) {
-        this.isCritical = false;
-        this.scene.triggerMissionFailed('Facility reinforcements overwhelmed your position.');
-      }
-    }
-  }
-
-  reset() {
-    this.level = 0;
-    this.decayTimer = 0;
-    this.isCritical = false;
-    this.criticalTimer = 10;
   }
 }

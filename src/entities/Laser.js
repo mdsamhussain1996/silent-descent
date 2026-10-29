@@ -1,105 +1,67 @@
-import Phaser from 'phaser';
-import { audioSystem } from '../systems/Audio.js';
+// src/entities/Laser.js
+// 2.5D Pulsing Laser Grid Tripwire with alarm trigger
 
-export class LaserTripwire extends Phaser.GameObjects.Container {
-  constructor(scene, startX, startY, endX, endY, config = {}) {
-    super(scene, 0, 0);
-    scene.add.existing(this);
+import * as THREE from 'three';
+import { audio } from '../core/Audio.js';
 
-    this.startX = startX;
-    this.startY = startY;
-    this.endX = endX;
-    this.endY = endY;
-    this.isPulsing = config.isPulsing || false;
-    this.isHidden = config.isHidden || false; // invisible unless thermal visor is ON
-    this.pulseCycle = config.pulseCycle || 1.5; // 1.5s on, 1.5s off
-    this.pulseTimer = 0;
-    this.isActive = true;
+export class LaserTripwire {
+  constructor(scene, x, y1, y2, alarmSystem) {
+    this.scene = scene;
+    this.x = x;
+    this.y1 = Math.min(y1, y2);
+    this.y2 = Math.max(y1, y2);
+    this.alarmSystem = alarmSystem;
 
-    // Emitters at both ends
-    this.emitter1 = scene.add.image(startX, startY, 'laser_emitter').setDepth(48);
-    this.emitter2 = scene.add.image(endX, endY, 'laser_emitter').setDepth(48).setFlipX(true);
+    this.active = true;
+    this.pulseTime = 0;
 
-    // Laser beam graphics
-    this.beamGraphics = scene.add.graphics().setDepth(49);
-    this.add(this.beamGraphics);
+    // Laser Beam Cylinder Mesh
+    const height = this.y2 - this.y1;
+    const geo = new THREE.CylinderGeometry(0.02, 0.02, height, 8);
+    geo.translate(0, height / 2, 0);
 
-    this.lineGeom = new Phaser.Geom.Line(startX, startY, endX, endY);
+    this.mat = new THREE.MeshBasicMaterial({
+      color: 0xef4444,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+
+    this.mesh = new THREE.Mesh(geo, this.mat);
+    this.mesh.position.set(this.x, this.y1, 0.05);
+    this.scene.add(this.mesh);
+
+    // Emitter pods
+    const podGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+    const podMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+    const podBottom = new THREE.Mesh(podGeo, podMat);
+    podBottom.position.set(this.x, this.y1, 0);
+    const podTop = new THREE.Mesh(podGeo, podMat);
+    podTop.position.set(this.x, this.y2, 0);
+    this.scene.add(podBottom);
+    this.scene.add(podTop);
   }
 
-  update(time, delta) {
-    const dt = delta / 1000;
+  update(dt, player) {
+    if (!this.active) return;
+    this.pulseTime += dt * 4;
+    this.mat.opacity = 0.65 + Math.sin(this.pulseTime) * 0.25;
 
-    if (this.isPulsing) {
-      this.pulseTimer += dt;
-      if (this.pulseTimer >= this.pulseCycle) {
-        this.pulseTimer = 0;
-        this.isActive = !this.isActive;
-      }
-    }
-
-    this.drawBeam();
-    this.checkCollision();
-  }
-
-  drawBeam() {
-    this.beamGraphics.clear();
-
-    const isThermal = this.scene.player && this.scene.player.thermalActive;
-
-    // If hidden and thermal is not active, do not render beam
-    if (this.isHidden && !isThermal) {
-      return;
-    }
-
-    if (!this.isActive) return;
-
-    // Outer glow line
-    const color = isThermal ? 0x38bdf8 : 0xff2222;
-    this.beamGraphics.lineStyle(2.5, color, isThermal ? 0.9 : 0.45);
-    this.beamGraphics.strokeLineShape(this.lineGeom);
-
-    // Core bright beam
-    this.beamGraphics.lineStyle(1.0, 0xffffff, 0.95);
-    this.beamGraphics.strokeLineShape(this.lineGeom);
-  }
-
-  checkCollision() {
-    if (!this.isActive) return;
-
-    const player = this.scene.player;
-    if (!player || player.state === 'dead') return;
-
-    // If player is hanging from overhead pipe above the beam, they pass over safely!
-    if (player.state === 'pipe_hang') {
-      const playerY = player.y - 12; // top of body
-      if (playerY < Math.min(this.startY, this.endY)) {
-        return; // safely above beam
-      }
-    }
-
-    // Check intersection with player hitbox bounds
-    const playerBounds = player.getBounds();
-    if (Phaser.Geom.Intersects.LineToRectangle(this.lineGeom, playerBounds)) {
-      audioSystem.playLaserHum();
-      this.scene.alarm.raise('Laser tripwire tripped');
-      // Spark effect
-      for (let i = 0; i < 4; i++) {
-        const p = this.scene.add.circle(player.x, player.y, 2, 0xff2222);
-        this.scene.tweens.add({
-          targets: p,
-          x: player.x + Phaser.Math.Between(-10, 10),
-          y: player.y + Phaser.Math.Between(-10, 10),
-          alpha: 0,
-          duration: 200,
-          onComplete: () => p.destroy()
-        });
-      }
+    // AABB trigger check against player
+    if (
+      player.x + 0.25 > this.x - 0.08 &&
+      player.x - 0.25 < this.x + 0.08 &&
+      player.y < this.y2 &&
+      player.y + 1.6 > this.y1
+    ) {
+      // Player intersected laser tripwire!
+      audio.playLaserTrip();
+      if (this.alarmSystem) this.alarmSystem.raise(this.x, (this.y1 + this.y2) / 2);
     }
   }
 
   disable() {
-    this.isActive = false;
-    this.beamGraphics.clear();
+    this.active = false;
+    this.mesh.visible = false;
   }
 }

@@ -1,152 +1,130 @@
-import Phaser from 'phaser';
-import { audioSystem } from '../systems/Audio.js';
+// src/entities/Camera.js
+// 2.5D Surveillance Camera: sweeping ±35° cone, disables for 8s when shot
 
-export class SecurityCamera extends Phaser.GameObjects.Container {
-  constructor(scene, x, y, config = {}) {
-    super(scene, x, y);
-    scene.add.existing(this);
+import * as THREE from 'three';
+import { collision } from '../world/Collision.js';
+import { audio } from '../core/Audio.js';
 
-    this.baseAngle = config.baseAngle || 90; // pointing down/right
-    this.sweepRange = config.sweepRange || 35; // +-35 degrees
-    this.sweepDuration = config.sweepDuration || 3000; // 3s cycle
-    this.range = config.range || 120;
-    this.isDisabled = false;
-    this.disableTimer = 0;
-    this.detectionTimer = 0; // 1s to trigger alarm
+export class SecurityCamera {
+  constructor(scene, x, y, alarmSystem) {
+    this.scene = scene;
+    this.x = x;
+    this.y = y;
+    this.alarmSystem = alarmSystem;
 
-    // Camera mount sprite
-    this.camSprite = scene.add.image(0, 0, 'camera').setOrigin(0.2, 0.5);
-    this.add(this.camSprite);
+    this.sweepAngle = 0;
+    this.sweepSpeed = 0.8;
+    this.sweepRange = (35 * Math.PI) / 180;
+    this.disabledTimer = 0;
+    this.detectionTimer = 0;
 
-    // Vision cone graphics
-    this.coneGraphics = scene.add.graphics();
-    this.scene.add.existing(this.coneGraphics);
-    this.coneGraphics.setDepth(45);
+    // 3D Mesh
+    this.mesh = this.buildCameraModel();
+    this.scene.add(this.mesh);
 
-    // Start sweep tween
-    this.startSweep();
+    // Cyan / Red Detection Sweep Cone
+    this.coneMesh = this.buildSweepCone();
+    this.scene.add(this.coneMesh);
   }
 
-  startSweep() {
-    this.sweepTween = this.scene.tweens.add({
-      targets: this.camSprite,
-      angle: { from: this.baseAngle - this.sweepRange, to: this.baseAngle + this.sweepRange },
-      duration: this.sweepDuration,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
+  buildCameraModel() {
+    const root = new THREE.Group();
+    root.position.set(this.x, this.y, 0);
+
+    // Wall mount
+    const mountGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.2, 8);
+    const mountMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
+    const mount = new THREE.Mesh(mountGeo, mountMat);
+    mount.rotation.z = Math.PI / 2;
+    root.add(mount);
+
+    // Camera body
+    const bodyGeo = new THREE.BoxGeometry(0.32, 0.18, 0.18);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
+    this.bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+    this.bodyMesh.position.set(0.1, -0.05, 0);
+    root.add(this.bodyMesh);
+
+    // Blinking LED
+    const ledGeo = new THREE.SphereGeometry(0.04, 6, 6);
+    this.ledMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    const led = new THREE.Mesh(ledGeo, this.ledMat);
+    led.position.set(0.25, 0.05, 0.08);
+    root.add(led);
+
+    return root;
+  }
+
+  buildSweepCone() {
+    const coneGeo = new THREE.ConeGeometry(2.5, 6, 16, 1, true);
+    coneGeo.translate(0, -3, 0);
+    coneGeo.rotateX(-Math.PI / 2);
+    this.coneMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
     });
+    const cone = new THREE.Mesh(coneGeo, this.coneMat);
+    cone.position.set(this.x, this.y, 0);
+    return cone;
   }
 
-  update(time, delta) {
-    const dt = delta / 1000;
+  disable(duration = 8.0) {
+    this.disabledTimer = duration;
+    this.coneMesh.visible = false;
+    this.ledMat.color.setHex(0x475569);
+  }
 
-    if (this.isDisabled) {
-      this.coneGraphics.clear();
-      this.disableTimer -= dt;
-      if (this.disableTimer <= 0) {
-        this.isDisabled = false;
-        this.camSprite.clearTint();
-        if (this.sweepTween) this.sweepTween.resume();
+  update(dt, player) {
+    if (this.disabledTimer > 0) {
+      this.disabledTimer -= dt;
+      if (this.disabledTimer <= 0) {
+        this.coneMesh.visible = true;
+        this.ledMat.color.setHex(0xef4444);
       }
       return;
     }
 
-    this.checkPlayerDetection(dt);
-    this.drawCone();
-  }
+    // Sweep camera left and right
+    this.sweepAngle = Math.sin(performance.now() * 0.001 * this.sweepSpeed) * this.sweepRange;
+    const baseAngle = -Math.PI / 2 + 0.3; // pointing downwards
+    const currentAngle = baseAngle + this.sweepAngle;
 
-  checkPlayerDetection(dt) {
-    const player = this.scene.player;
-    if (!player || player.state === 'dead') {
-      this.detectionTimer = 0;
-      return;
-    }
+    this.bodyMesh.rotation.z = currentAngle;
+    this.coneMesh.rotation.z = currentAngle + Math.PI / 2;
 
-    const rad = Phaser.Math.DegToRad(this.camSprite.angle);
-    const facingX = Math.cos(rad);
-    const facingY = Math.sin(rad);
-
+    // Check Player in vision cone
     const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const dy = (player.y + 1.0) - this.y;
+    const dist = Math.hypot(dx, dy);
 
-    if (dist <= this.range) {
-      // Dot product to check angle
-      const normX = dx / dist;
-      const normY = dy / dist;
-      const dot = facingX * normX + facingY * normY;
-      const cosHalfFov = Math.cos(Phaser.Math.DegToRad(25)); // 50 deg total FOV
+    if (dist < 6.5) {
+      const angleToPlayer = Math.atan2(dy, dx);
+      const angleDiff = Math.abs(angleToPlayer - currentAngle);
 
-      if (dot > cosHalfFov) {
-        // Player spotted by camera!
-        this.detectionTimer += dt;
-        if (this.detectionTimer >= 1.0) {
-          this.detectionTimer = 0;
-          this.scene.alarm.raise('Security camera spotted Ghost');
+      if (angleDiff < Math.PI / 5) {
+        // Line of sight raycast
+        const cast = collision.raycast(this.x, this.y, player.x, player.y + 1.0);
+        if (!cast.hit || cast.fraction > 0.95) {
+          // Detected by camera!
+          this.detectionTimer += dt;
+          this.coneMat.color.setHex(0xff0000);
+          this.coneMat.opacity = 0.25;
+
+          if (this.detectionTimer >= 0.8) {
+            audio.playAlarmSiren();
+            if (this.alarmSystem) this.alarmSystem.raise(this.x, this.y);
+          }
+          return;
         }
-        return;
       }
     }
 
-    this.detectionTimer = Math.max(0, this.detectionTimer - dt * 1.5);
-  }
-
-  drawCone() {
-    this.coneGraphics.clear();
-    const rad = Phaser.Math.DegToRad(this.camSprite.angle);
-    const startX = this.x;
-    const startY = this.y;
-    const spread = Phaser.Math.DegToRad(25);
-
-    const isDetecting = this.detectionTimer > 0.3;
-    const color = isDetecting ? 0xff0033 : 0xef4444;
-    const alpha = isDetecting ? 0.45 : 0.22;
-
-    this.coneGraphics.fillStyle(color, alpha);
-    this.coneGraphics.beginPath();
-    this.coneGraphics.moveTo(startX, startY);
-    this.coneGraphics.arc(startX, startY, this.range, rad - spread, rad + spread);
-    this.coneGraphics.closePath();
-    this.coneGraphics.fill();
-  }
-
-  // Shot by silenced pistol: spark + static, disabled for 8s
-  shootDisable() {
-    if (!this.wasCountedDisabled && this.scene.objectives) {
-      this.wasCountedDisabled = true;
-      this.scene.objectives.onCameraDisabled();
-    }
-    this.isDisabled = true;
-    this.disableTimer = 8.0;
-    this.camSprite.setTint(0x64748b);
-    if (this.sweepTween) this.sweepTween.pause();
-    this.coneGraphics.clear();
-
-    // Sparks
-    for (let i = 0; i < 6; i++) {
-      const spark = this.scene.add.circle(this.x, this.y, 1.5, 0x38bdf8);
-      this.scene.tweens.add({
-        targets: spark,
-        x: this.x + Phaser.Math.Between(-15, 15),
-        y: this.y + Phaser.Math.Between(-15, 15),
-        alpha: 0,
-        duration: 300,
-        onComplete: () => spark.destroy()
-      });
-    }
-  }
-
-  // Permanently disabled by security terminal hack
-  permanentlyDisable() {
-    if (!this.wasCountedDisabled && this.scene.objectives) {
-      this.wasCountedDisabled = true;
-      this.scene.objectives.onCameraDisabled();
-    }
-    this.isDisabled = true;
-    this.disableTimer = 999999;
-    this.camSprite.setTint(0x334155);
-    if (this.sweepTween) this.sweepTween.stop();
-    this.coneGraphics.clear();
+    this.detectionTimer = Math.max(0, this.detectionTimer - dt);
+    this.coneMat.color.setHex(0x00f0ff);
+    this.coneMat.opacity = 0.09;
   }
 }
