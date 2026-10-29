@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/Boot.js';
 import { PreloadScene } from './scenes/Preload.js';
 import { TitleScene } from './scenes/Title.js';
+import { CampaignMapScene } from './scenes/CampaignMap.js';
 import { BriefingScene } from './scenes/Briefing.js';
+import { LoadoutScene } from './scenes/Loadout.js';
 import { IntroScene } from './scenes/Intro.js';
 import { GameScene } from './scenes/Game.js';
 import { HUDScene } from './scenes/HUD.js';
@@ -12,8 +14,8 @@ import { PauseScene } from './scenes/Pause.js';
 import { MissionCompleteScene } from './scenes/MissionComplete.js';
 import { MissionFailedScene } from './scenes/MissionFailed.js';
 
-export const GAME_WIDTH = 480;
-export const GAME_HEIGHT = 270;
+export const GAME_WIDTH = 640;
+export const GAME_HEIGHT = 360;
 export const TILE_SIZE = 16;
 
 export const PALETTE = {
@@ -63,7 +65,9 @@ export const config = {
     BootScene,
     PreloadScene,
     TitleScene,
+    CampaignMapScene,
     BriefingScene,
+    LoadoutScene,
     IntroScene,
     GameScene,
     HUDScene,

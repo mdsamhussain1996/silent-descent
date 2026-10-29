@@ -935,6 +935,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
+    if (ci.onInteract && input.actionJustPressed) {
+      ci.onInteract(this);
+    }
+
     // Scavenge ammo/weapons from knocked-out guards
     if (input.actionJustPressed && this.scene.guards) {
       const body = this.scene.guards.getChildren().find(g => {

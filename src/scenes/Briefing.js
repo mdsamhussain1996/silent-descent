@@ -1,113 +1,231 @@
+// src/scenes/Briefing.js
+// Tactical Mission Briefing Dossier & Parameters
+
 import Phaser from 'phaser';
 import { audioSystem } from '../systems/Audio.js';
+import { SaveSystem } from '../systems/SaveSystem.js';
+import { CAMPAIGN_MISSIONS } from './CampaignMap.js';
 
 export class BriefingScene extends Phaser.Scene {
   constructor() {
     super('BriefingScene');
   }
 
+  init(data) {
+    this.mission = data.mission || CAMPAIGN_MISSIONS[0];
+  }
+
   create() {
-    // Backdrop
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+    const saveData = SaveSystem.load();
+
+    // Dark classified dossier backdrop
     const bg = this.add.graphics();
-    bg.fillStyle(0x05070c, 1);
-    bg.fillRect(0, 0, 480, 270);
+    bg.fillStyle(0x040810, 1);
+    bg.fillRect(0, 0, w, h);
 
     // Frame
-    bg.lineStyle(1.5, 0x0284c7, 0.8);
-    bg.strokeRect(10, 10, 460, 250);
+    bg.lineStyle(1.5, 0x0284c7, 0.7);
+    bg.strokeRect(10, 10, w - 20, h - 20);
 
-    // Header strip
-    bg.fillStyle(0x0f172a, 1);
-    bg.fillRect(11, 11, 458, 22);
+    // Header Strip
+    bg.fillStyle(0x0c1726, 1);
+    bg.fillRect(11, 11, w - 22, 28);
 
-    this.add.text(20, 16, 'NO TRACE PROTOCOL // OPERATION IRON TIDE', {
+    this.add.text(22, 16, `OPERATION DOSSIER // MISSION ${this.mission.num}: ${this.mission.title}`, {
       fontFamily: 'Rajdhani, sans-serif',
-      fontSize: '12px',
+      fontSize: '15px',
       fontStyle: 'bold',
       color: '#38bdf8',
       letterSpacing: 2
     });
 
-    this.add.text(370, 17, 'CLASSIFIED // TOP SECRET', {
+    this.add.text(w - 200, 18, 'CLASSIFIED // TOP SECRET // EYES ONLY', {
       fontFamily: 'Share Tech Mono, monospace',
-      fontSize: '8px',
+      fontSize: '9px',
       color: '#ef4444'
     });
 
-    // Content: Left column (Mission Dossier)
-    const dossier = [
-      'OPERATIVE: Vikram "Ghost" Rao',
-      'AGENCY: NO TRACE Strategic Division',
-      'TARGET: Kestrel Dynamics Harbour Hub',
-      '',
-      'PRIMARY OBJECTIVE:',
-      '• Infiltrate office & warehouse',
-      '• Hack security terminal to unlock cage',
-      '• Retrieve stolen Guidance Chip Drive',
-      '• Reach pier for helicopter extraction',
-      '',
-      'RULES OF ENGAGEMENT:',
-      '• Stay in shadows. Avoid guard vision cones.',
-      '• Pipe hang renders you invisible from below.',
-      '• Shoot out lights to create dark paths.'
+    // Left Column: Classified Story & Evidence Photo
+    const photoKey = this.mission.num === 1 ? 'evidence_manifest' : 'mission_dossiers';
+    if (this.textures.exists(photoKey)) {
+      const photo = this.add.image(120, 120, photoKey);
+      photo.setDisplaySize(200, 130);
+      this.add.rectangle(120, 120, 200, 130).setStrokeStyle(1.5, 0x00f0ff, 0.6);
+    }
+
+    this.add.text(22, 195, `LOCATION: ${this.mission.location}`, {
+      fontFamily: 'Share Tech Mono, monospace',
+      fontSize: '10px',
+      color: '#f59e0b'
+    });
+
+    this.add.text(22, 210, `HVT / TARGET: ${this.mission.target}`, {
+      fontFamily: 'Share Tech Mono, monospace',
+      fontSize: '10px',
+      color: '#38bdf8'
+    });
+
+    // Story narrative text
+    const storyBox = this.add.text(22, 230, this.mission.desc, {
+      fontFamily: 'Share Tech Mono, monospace',
+      fontSize: '9px',
+      color: '#94a3b8',
+      wordWrap: { width: 230 }
+    });
+
+    // Middle Column: Primary & Secondary Objectives
+    this.add.text(270, 48, 'PRIMARY OBJECTIVES (REQUIRED):', {
+      fontFamily: 'Rajdhani, sans-serif',
+      fontSize: '13px',
+      fontStyle: 'bold',
+      color: '#f59e0b'
+    });
+
+    const m1Primaries = [
+      '1. Infiltrate yard via helicopter rappel',
+      '2. Hack security terminal for vault code',
+      '3. Photograph manifest on manager desk',
+      '4. Rescue Dr. Meera Sen from interrogation',
+      '5. Plant tracker beacon on naval container',
+      '6. Extract with Meera by helicopter at dock'
     ];
 
-    dossier.forEach((line, idx) => {
-      this.add.text(24, 44 + idx * 12, line, {
+    const displayPrimaries = this.mission.num === 1 ? m1Primaries : this.mission.objectives;
+    displayPrimaries.forEach((obj, idx) => {
+      this.add.text(270, 70 + idx * 16, `• ${obj}`, {
         fontFamily: 'Share Tech Mono, monospace',
-        fontSize: '8px',
-        color: line.startsWith('•') ? '#f8fafc' : (line.includes('OBJECTIVE') ? '#f59e0b' : '#94a3b8')
+        fontSize: '9px',
+        color: '#f8fafc'
       });
     });
 
-    // Content: Right column (Tactical Controls & Gadgets)
-    const controls = [
-      'TACTICAL ARSENAL & CONTROLS:',
-      '← / → : Move / Sneak / Sprint',
-      '↑ / ↓ : Climb / Crouch Cover / Wall-Press',
-      'SPACE : Jump / Ledge Pull Up',
-      'J     : Takedown / Interact / Hack',
-      'K / LMB: Fire Weapon (Green Laser Sight)',
-      'Q / E : Cycle Arsenal (Pistol/SMG/Shotgun)',
-      'R     : Tactical Reload',
-      'G     : Deploy Gadget (Taser / Noise Lure)',
-      'V     : Thermal Visor (6s duration, 10s CD)',
-      'TOUCH : On-screen Virtual Tactical Buttons'
+    // Secondary & Fail Conditions
+    this.add.text(270, 185, 'SECONDARY OBJECTIVES (RANK BONUS):', {
+      fontFamily: 'Rajdhani, sans-serif',
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#10b981'
+    });
+
+    const secondaries = [
+      '• NO ALARMS (Clean Ghost)',
+      '• NO KILLS (Non-lethal takedowns only)',
+      '• COLLECT 3 CLASSIFIED INTEL FILES',
+      '• DISABLE 4 SURVEILLANCE CAMERAS',
+      '• COMPLETE UNDER 12 MINUTES'
     ];
 
-    controls.forEach((line, idx) => {
-      this.add.text(240, 44 + idx * 12, line, {
+    secondaries.forEach((sec, idx) => {
+      this.add.text(270, 205 + idx * 13, sec, {
         fontFamily: 'Share Tech Mono, monospace',
-        fontSize: '8px',
-        color: idx === 0 ? '#38bdf8' : (line.startsWith('V') || line.startsWith('Q') ? '#fbbf24' : '#cbd5e1')
+        fontSize: '8.5px',
+        color: '#94a3b8'
       });
     });
 
-    // Portraits on sides
-    this.add.image(214, 60, 'portrait_ghost').setScale(1.1);
-    this.add.image(214, 110, 'portrait_control').setScale(1.1);
+    // Right Column: Loadout Preview
+    this.add.text(490, 48, 'EQUIPPED LOADOUT:', {
+      fontFamily: 'Rajdhani, sans-serif',
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#00f0ff'
+    });
 
-    // Proceed Button
-    const btn = this.add.rectangle(240, 236, 200, 20, 0x0284c7, 0.9)
+    const loadout = saveData.loadout;
+    const loadoutLines = [
+      `PRI: ${loadout.primaryWeapon.toUpperCase()}`,
+      `SEC: ${loadout.secondaryWeapon.toUpperCase()}`,
+      `GAD 1: ${loadout.gadget1.toUpperCase()}`,
+      `GAD 2: ${loadout.gadget2.toUpperCase()}`
+    ];
+
+    loadoutLines.forEach((line, idx) => {
+      this.add.text(490, 70 + idx * 16, line, {
+        fontFamily: 'Share Tech Mono, monospace',
+        fontSize: '9px',
+        color: '#38bdf8'
+      });
+    });
+
+    // Informant Portrait preview for M1
+    if (this.mission.num === 1 && this.textures.exists('portrait_meera')) {
+      this.add.text(490, 150, 'ASSET: DR. MEERA SEN', {
+        fontFamily: 'Rajdhani, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#f59e0b'
+      });
+      const meeraPic = this.add.image(530, 205, 'portrait_meera');
+      meeraPic.setDisplaySize(80, 80);
+      this.add.rectangle(530, 205, 80, 80).setStrokeStyle(1, 0x10b981, 0.6);
+    }
+
+    // Bottom Action Bar
+    const bottomBar = this.add.graphics();
+    bottomBar.fillStyle(0x0c1726, 0.95);
+    bottomBar.fillRect(11, h - 38, w - 22, 27);
+    bottomBar.lineStyle(1, 0x0284c7, 0.5);
+    bottomBar.strokeLineShape(new Phaser.Geom.Line(11, h - 38, w - 11, h - 38));
+
+    // Launch Button
+    const launchBtn = this.add.rectangle(w - 110, h - 25, 170, 22, 0x0284c7, 0.95)
       .setStrokeStyle(1, 0x38bdf8)
       .setInteractive({ useHandCursor: true });
 
-    const btnText = this.add.text(240, 236, 'PROCEED TO INSERTION [SPACE / J]', {
+    this.add.text(w - 110, h - 25, 'LAUNCH INFILTRATION ►', {
       fontFamily: 'Rajdhani, sans-serif',
-      fontSize: '11px',
+      fontSize: '12px',
       fontStyle: 'bold',
       color: '#ffffff'
     }).setOrigin(0.5);
 
-    const proceed = () => {
+    const startMission = () => {
       audioSystem.playTerminalBeep(1000);
-      this.scene.start('IntroScene');
+      if (this.mission.num === 1) {
+        this.scene.start('IntroScene', { mission: this.mission });
+      } else {
+        // Greybox mission launch
+        this.scene.start('GameScene', { mission: this.mission });
+      }
     };
 
-    btn.on('pointerdown', proceed);
+    launchBtn.on('pointerdown', startMission);
 
-    this.input.keyboard.on('keydown-SPACE', proceed);
-    this.input.keyboard.on('keydown-ENTER', proceed);
-    this.input.keyboard.on('keydown-J', proceed);
+    // Armory / Customize Loadout button
+    const loadoutBtn = this.add.rectangle(w - 240, h - 25, 120, 22, 0x1e293b, 0.9)
+      .setStrokeStyle(1, 0x38bdf8)
+      .setInteractive({ useHandCursor: true });
+
+    this.add.text(w - 240, h - 25, 'ARMORY [L]', {
+      fontFamily: 'Share Tech Mono, monospace',
+      fontSize: '10px',
+      color: '#38bdf8'
+    }).setOrigin(0.5);
+
+    loadoutBtn.on('pointerdown', () => {
+      audioSystem.playTerminalBeep(850);
+      this.scene.start('LoadoutScene', { returnTo: 'BriefingScene', mission: this.mission });
+    });
+
+    // Return to Map button
+    const backBtn = this.add.text(25, h - 25, '◄ CAMPAIGN MAP [ESC]', {
+      fontFamily: 'Share Tech Mono, monospace',
+      fontSize: '10px',
+      color: '#64748b'
+    }).setInteractive({ useHandCursor: true });
+
+    backBtn.on('pointerdown', () => this.scene.start('CampaignMapScene'));
+
+    // Keyboard Hotkeys
+    this.input.keyboard.on('keydown-SPACE', startMission);
+    this.input.keyboard.on('keydown-ENTER', startMission);
+    this.input.keyboard.on('keydown-L', () => {
+      this.scene.start('LoadoutScene', { returnTo: 'BriefingScene', mission: this.mission });
+    });
+    this.input.keyboard.on('keydown-ESC', () => {
+      this.scene.start('CampaignMapScene');
+    });
   }
 }

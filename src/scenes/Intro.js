@@ -1,6 +1,8 @@
+// src/scenes/Intro.js
+// Cinematic Insertion Cutscene (640x360)
+
 import Phaser from 'phaser';
 import { audioSystem } from '../systems/Audio.js';
-import { DialogueSystem } from '../systems/Dialogue.js';
 
 export class IntroScene extends Phaser.Scene {
   constructor() {
@@ -8,121 +10,138 @@ export class IntroScene extends Phaser.Scene {
   }
 
   create() {
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+
     audioSystem.init();
     audioSystem.resume();
     audioSystem.startHelicopterLoop();
-    audioSystem.setHelicopterVolume(0.18);
+    audioSystem.setHelicopterVolume(0.2);
 
-    // Letterbox bars (cinematic 16:9 spy cutscene)
+    // Deep stormy night backdrop
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x05070c, 0x070b14, 0x0a121e, 0x0f192b, 1);
-    bg.fillRect(0, 0, 480, 270);
+    bg.fillGradientStyle(0x04070e, 0x070c18, 0x0a1424, 0x0f1d33, 1);
+    bg.fillRect(0, 0, w, h);
 
-    // Distant harbour skyline & clouds
+    // Distant harbour skyline & rooftop silhouettes
     const skyline = this.add.graphics();
-    skyline.fillStyle(0x0d141f, 0.8);
-    skyline.fillRect(0, 180, 480, 90);
-    // Rooftop target visible below
-    skyline.fillStyle(0x18202c, 1);
-    skyline.fillRect(200, 220, 280, 50);
+    skyline.fillStyle(0x08101a, 0.85);
+    skyline.fillRect(0, h - 110, w, 110);
+    // Industrial target roof below
+    skyline.fillStyle(0x111c2a, 1);
+    skyline.fillRect(240, h - 80, 400, 80);
 
-    // Rain streaks
-    for (let i = 0; i < 35; i++) {
+    // Heavy rain streaks
+    for (let i = 0; i < 50; i++) {
       const drop = this.add.rectangle(
-        Phaser.Math.Between(0, 480),
-        Phaser.Math.Between(-20, 270),
+        Phaser.Math.Between(0, w),
+        Phaser.Math.Between(-20, h),
         1,
-        Phaser.Math.Between(8, 16),
+        Phaser.Math.Between(10, 20),
         0x38bdf8,
         0.35
       );
       this.tweens.add({
         targets: drop,
-        y: 280,
+        y: h + 20,
         x: drop.x + 40,
-        duration: Phaser.Math.Between(300, 500),
+        duration: Phaser.Math.Between(350, 600),
         repeat: -1,
         delay: Phaser.Math.Between(0, 400)
       });
     }
 
-    // Sweeping searchlight in clouds
-    const cloudSearchlight = this.add.graphics();
-    cloudSearchlight.fillStyle(0x38bdf8, 0.1);
-    cloudSearchlight.beginPath();
-    cloudSearchlight.moveTo(100, 270);
-    cloudSearchlight.arc(100, 270, 280, -Math.PI * 0.8, -Math.PI * 0.4);
-    cloudSearchlight.closePath();
-    cloudSearchlight.fill();
+    // Stealth Insertion Chopper
+    const heli = this.add.image(-100, 100, 'heli_body');
+    heli.setDisplaySize(120, 50);
 
+    // Helicopter searchlight cone
+    const searchlight = this.add.graphics();
+    searchlight.fillStyle(0x38bdf8, 0.18);
+    searchlight.beginPath();
+    searchlight.moveTo(0, 20);
+    searchlight.lineTo(-50, 180);
+    searchlight.lineTo(50, 180);
+    searchlight.closePath();
+    searchlight.fill();
+    heli.searchlight = searchlight;
+
+    // Fast fly-in and hover over rooftop
     this.tweens.add({
-      targets: cloudSearchlight,
-      alpha: 0.03,
-      duration: 3000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
-    });
-
-    // Stealth Helicopter NIGHTFALL "Kite" flies in from left
-    this.heli = this.add.image(-100, 80, 'helicopter').setScale(1.2).setDepth(100);
-
-    // Dialogue system
-    this.dialogue = new DialogueSystem(this);
-
-    // Sequence:
-    // 1. Heli flies in and hovers above roof
-    this.tweens.add({
-      targets: this.heli,
-      x: 270,
-      duration: 2500,
+      targets: heli,
+      x: 340,
+      y: 110,
+      duration: 2200,
       ease: 'Power2.easeOut',
-      onComplete: () => {
-        // Subtle hover bob
-        this.tweens.add({
-          targets: this.heli,
-          y: 84,
-          duration: 800,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-
-        // 2. Radio dialogue plays
-        this.playIntroDialogue();
-      }
-    });
-
-    // Skip / Advance button
-    this.input.keyboard.on('keydown-SPACE', () => this.dialogue.advance());
-    this.input.keyboard.on('keydown-J', () => this.dialogue.advance());
-    this.input.on('pointerdown', () => this.dialogue.advance());
-  }
-
-  playIntroDialogue() {
-    const script = [
-      {
-        speaker: 'Control',
-        text: 'Ghost, you are over the Kestrel yard. Power is on, cameras are live. Nobody sees you.'
+      onUpdate: () => {
+        searchlight.setPosition(heli.x, heli.y);
       },
-      {
-        speaker: 'Ghost',
-        text: 'Copy that. Going quiet.'
-      }
-    ];
+      onComplete: () => {
+        // Deploy Rappel Cable
+        const rope = this.add.line(0, 0, 340, 125, 340, h - 80, 0x78716c).setOrigin(0);
+        rope.setLineWidth(2);
 
-    this.dialogue.showSequence(script, () => {
-      // 3. Drop rappel rope and transition to GameScene
-      const rope = this.add.rectangle(260, 95, 2, 0, 0x475569).setOrigin(0.5, 0).setDepth(90);
-      this.tweens.add({
-        targets: rope,
-        height: 125,
-        duration: 800,
-        ease: 'Power1.easeIn',
-        onComplete: () => {
-          this.scene.start('GameScene', { startingAtRappel: true });
-        }
-      });
+        // Ghost rappels down cable
+        const ghostRappel = this.add.sprite(340, 130, 'ghost_sheet', 0);
+        ghostRappel.setDisplaySize(32, 48);
+
+        this.tweens.add({
+          targets: ghostRappel,
+          y: h - 94,
+          duration: 1100,
+          ease: 'Power1.easeIn',
+          onComplete: () => {
+            audioSystem.playFootstep();
+
+            // Flash amber visor
+            const visorFlash = this.add.circle(345, h - 105, 5, 0xf59e0b, 0.9);
+            this.tweens.add({
+              targets: visorFlash,
+              scale: 2.5,
+              alpha: 0,
+              duration: 500
+            });
+
+            // Cut cable and chopper departs
+            rope.destroy();
+            this.tweens.add({
+              targets: heli,
+              x: w + 160,
+              y: 60,
+              duration: 1800,
+              ease: 'Power2.easeIn',
+              onUpdate: () => {
+                searchlight.setPosition(heli.x, heli.y);
+              }
+            });
+
+            // Status title
+            const missionText = this.add.text(w / 2, h / 2 - 40, 'INSERTION SUCCESSFUL\nNO TRACE: COMMENCE RECON', {
+              fontFamily: 'Rajdhani, sans-serif',
+              fontSize: '18px',
+              fontStyle: 'bold',
+              color: '#38bdf8',
+              align: 'center',
+              letterSpacing: 3
+            }).setOrigin(0.5);
+
+            this.time.delayedCall(1600, () => {
+              this.cameras.main.fade(500, 0, 0, 0);
+              this.time.delayedCall(500, () => {
+                this.scene.start('GameScene', { mission: { id: 'm1', num: 1 } });
+              });
+            });
+          }
+        });
+      }
     });
+
+    // Skip intro key
+    const skip = () => {
+      this.scene.start('GameScene', { mission: { id: 'm1', num: 1 } });
+    };
+    this.input.keyboard.on('keydown-SPACE', skip);
+    this.input.keyboard.on('keydown-ENTER', skip);
+    this.input.on('pointerdown', skip);
   }
 }

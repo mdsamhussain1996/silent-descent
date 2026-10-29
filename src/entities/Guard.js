@@ -261,9 +261,8 @@ export class Guard extends Phaser.Physics.Arcade.Sprite {
         const dx = other.x - this.x;
         if (dist < 100 && dx * facingDir > 0) {
           other.bodyDiscovered = true;
-          this.statusBubble.setText('!').setColor('#ef4444');
-          this.scene.alarm?.raise('Unconscious body discovered');
-          this.setAlertState();
+          this.scene.alarm?.raise('Unconscious body discovered', this);
+          this.setAlertState(true);
         }
       }
     });
@@ -347,13 +346,19 @@ export class Guard extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  setAlertState() {
+  setAlertState(fromAlarm = false) {
+    if (this.isKnockedOut || this.isDead) return;
+    if (this.state === 'alert') return;
     this.state = 'alert';
     this.isAlert = true;
-    this.statusBubble.setText('!').setColor('#ef4444'); // red '!'
+    if (this.statusBubble) {
+      this.statusBubble.setText('!').setColor('#ef4444'); // red '!'
+    }
     audioSystem.setSuspicionState(2);
     audioSystem.playRadioBlip();
-    this.scene.alarm?.raise('Guard spotted Ghost');
+    if (!fromAlarm) {
+      this.scene.alarm?.raise('Guard spotted Ghost', this);
+    }
     this.playAnim('alert');
   }
 

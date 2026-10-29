@@ -82,6 +82,7 @@ export class InputManager {
       space: Phaser.Input.Keyboard.KeyCodes.SPACE,
       shift: Phaser.Input.Keyboard.KeyCodes.SHIFT,
       j: Phaser.Input.Keyboard.KeyCodes.J,
+      f: Phaser.Input.Keyboard.KeyCodes.F,
       k: Phaser.Input.Keyboard.KeyCodes.K,
       l: Phaser.Input.Keyboard.KeyCodes.L,
       v: Phaser.Input.Keyboard.KeyCodes.V,
@@ -113,7 +114,7 @@ export class InputManager {
     const kDown = this.cursors.down.isDown || this.wasd.down.isDown;
     const kJump = this.keys.space.isDown;
     const kSneak = this.keys.shift.isDown;
-    const kAction = this.keys.j.isDown;
+    const kAction = this.keys.j.isDown || this.keys.f.isDown;
     const kShoot = this.keys.k.isDown;
     const kGrab = this.keys.l.isDown;
     const kThermal = this.keys.v.isDown;

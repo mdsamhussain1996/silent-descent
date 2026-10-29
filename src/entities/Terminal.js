@@ -37,13 +37,16 @@ export class Terminal extends Phaser.GameObjects.Container {
     this.promptText.setText('TERMINAL: ACCESS GRANTED').setColor('#22c55e').setVisible(true);
     this.terminalSprite.setTint(0x22c55e);
 
-    // Disables Section D cameras & reveals Data Drive location
+    if (this.scene.objectives) {
+      this.scene.objectives.completePrimary('hack_terminal');
+    }
+
     if (this.scene.sectionDCameras) {
       this.scene.sectionDCameras.forEach(cam => cam.permanentlyDisable());
     }
 
     if (this.scene.hud) {
-      this.scene.hud.setObjective('DATA DRIVE LOCATED IN CARGO WAREHOUSE CAGE');
+      this.scene.hud.refreshObjectives();
     }
 
     this.scene.time.delayedCall(2000, () => {

@@ -113,6 +113,10 @@ export class SecurityCamera extends Phaser.GameObjects.Container {
 
   // Shot by silenced pistol: spark + static, disabled for 8s
   shootDisable() {
+    if (!this.wasCountedDisabled && this.scene.objectives) {
+      this.wasCountedDisabled = true;
+      this.scene.objectives.onCameraDisabled();
+    }
     this.isDisabled = true;
     this.disableTimer = 8.0;
     this.camSprite.setTint(0x64748b);
@@ -135,6 +139,10 @@ export class SecurityCamera extends Phaser.GameObjects.Container {
 
   // Permanently disabled by security terminal hack
   permanentlyDisable() {
+    if (!this.wasCountedDisabled && this.scene.objectives) {
+      this.wasCountedDisabled = true;
+      this.scene.objectives.onCameraDisabled();
+    }
     this.isDisabled = true;
     this.disableTimer = 999999;
     this.camSprite.setTint(0x334155);

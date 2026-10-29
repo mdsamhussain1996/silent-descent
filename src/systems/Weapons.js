@@ -111,16 +111,14 @@ export class WeaponManager {
   getHUDData() {
     const key = this.getCurrentWeaponKey();
     const ammoData = this.ammo[key] || { mag: 0, reserve: 0 };
+    const activeGadgetCount = this.gadgets[this.selectedGadget]?.count ?? 0;
     return {
       key,
       mag: ammoData.mag,
       reserve: ammoData.reserve,
       isReloading: this.isReloading,
       selectedGadget: this.selectedGadget,
-      gadgetAmmo: {
-        taser: this.gadgets[GADGET_TYPES.TASER]?.count ?? 0,
-        noiseMaker: this.gadgets[GADGET_TYPES.NOISE_MAKER]?.count ?? 0
-      }
+      gadgetAmmo: activeGadgetCount
     };
   }
 

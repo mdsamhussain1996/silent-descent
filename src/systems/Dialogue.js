@@ -111,10 +111,14 @@ export class DialogueSystem {
 
     const isGhost = this.currentDialogue.speaker.toUpperCase().includes('GHOST');
     const isGuard = this.currentDialogue.speaker.toUpperCase().includes('GUARD');
+    const isMeera = this.currentDialogue.speaker.toUpperCase().includes('MEERA');
 
     if (isGhost) {
       this.portrait.setTexture('portrait_ghost');
       this.speakerText.setText('GHOST // OPERATIVE').setColor('#f59e0b');
+    } else if (isMeera && this.scene.textures.exists('portrait_meera')) {
+      this.portrait.setTexture('portrait_meera');
+      this.speakerText.setText('DR. MEERA SEN // ASSET').setColor('#10b981');
     } else if (isGuard) {
       this.portrait.setTexture('tiles', 1);
       this.speakerText.setText(this.currentDialogue.speaker.toUpperCase()).setColor('#e2e8f0');

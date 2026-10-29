@@ -6,35 +6,49 @@ export class AlarmSystem {
     this.level = 0; // 0, 1, 2, 3
     this.decayTimer = 0; // 60s to decay 1 level
     this.totalAlarmsTriggered = 0;
-    this.criticalTimer = 10; // 10s countdown at level 3
+    this.criticalTimer = 15; // 15s countdown at level 3
     this.isCritical = false;
+    this.raising = false; // re-entrancy protection
   }
 
-  raise(reason = 'detection') {
-    this.level = Math.min(3, this.level + 1);
-    this.totalAlarmsTriggered++;
-    this.decayTimer = 60; // reset decay timer
+  raise(reason = 'detection', source = null) {
+    if (this.raising) return;
+    this.raising = true;
 
-    audioSystem.playAlarmSiren();
-    audioSystem.setSuspicionState(2);
+    try {
+      this.level = Math.min(3, this.level + 1);
+      this.totalAlarmsTriggered++;
+      this.decayTimer = 60; // reset decay timer
 
-    if (this.level === 3) {
-      this.isCritical = true;
-      this.criticalTimer = 10;
-    }
+      audioSystem.playAlarmSiren();
+      audioSystem.setSuspicionState(2);
 
-    // Alert all guards in current section
-    if (this.scene.guards) {
-      this.scene.guards.getChildren().forEach(g => {
-        if (!g.isKnockedOut && !g.isDead) {
-          g.setAlertState();
-        }
-      });
-    }
+      if (this.level === 3) {
+        this.isCritical = true;
+        this.criticalTimer = 15;
+      }
 
-    // Notify HUD
-    if (this.scene.hud) {
-      this.scene.hud.onAlarmChange(this.level, reason);
+      // Alert nearby guards within ~600 px (or same section)
+      if (this.scene.guards) {
+        const sourceX = source && typeof source.x === 'number' 
+          ? source.x 
+          : (this.scene.player ? this.scene.player.x : 0);
+        this.scene.guards.getChildren().forEach(g => {
+          if (!g.isKnockedOut && !g.isDead) {
+            const dist = Math.abs(g.x - sourceX);
+            if (dist <= 600) {
+              g.setAlertState(true);
+            }
+          }
+        });
+      }
+
+      // Notify HUD
+      if (this.scene.hud) {
+        this.scene.hud.onAlarmChange(this.level, reason);
+      }
+    } finally {
+      this.raising = false;
     }
   }
 

@@ -65,9 +65,11 @@ export class CollectibleItem extends Phaser.GameObjects.Container {
       this.scene.onDataDriveCollected();
     } else if (this.itemType === 'intel') {
       player.intelCount++;
+      if (this.scene.objectives) {
+        this.scene.objectives.onIntelCollected();
+      }
       if (this.scene.hud) {
-        this.scene.hud.setObjective(`INTEL RETRIEVED (${player.intelCount}/3)`);
-        this.scene.hud.updateIntel(player.intelCount, 3);
+        this.scene.hud.refreshObjectives();
       }
     } else if (this.itemType === 'smg') {
       if (player.weapons) {

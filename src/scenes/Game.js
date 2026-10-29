@@ -15,6 +15,9 @@ import { InputManager } from '../systems/Input.js';
 import { DialogueSystem } from '../systems/Dialogue.js';
 import { SaveSystem } from '../systems/Save.js';
 import { audioSystem } from '../systems/Audio.js';
+import { ObjectiveManager } from '../systems/Objectives.js';
+import { RadioSystem } from '../systems/Radio.js';
+import { MeeraSen } from '../entities/Meera.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -24,6 +27,7 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     this.startingAtRappel = data.startingAtRappel !== undefined ? data.startingAtRappel : false;
     this.fromCheckpoint = data.fromCheckpoint !== undefined ? data.fromCheckpoint : false;
+    this.mission = data.mission || { id: 'm1', num: 1, title: 'IRON TIDE' };
   }
 
   create() {
@@ -32,6 +36,7 @@ export class GameScene extends Phaser.Scene {
     this.alarm = new AlarmSystem(this);
     this.inputManager = new InputManager(this);
     this.dialogue = new DialogueSystem(this);
+    this.radio = new RadioSystem(this);
 
     this.missionTimer = 0;
     this.isLockdown = false;
@@ -56,21 +61,24 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    // Build the World & Level Geometry (Sections A - F)
+    // Build the World & Level Geometry
     this.buildLevelWorld();
 
     // Spawn Player
     this.spawnPlayer();
+
+    // Initialize Mission Objectives
+    this.initMissionObjectives();
 
     // Checkpoint restoration if needed
     if (this.fromCheckpoint) {
       this.restoreSavedCheckpoint();
     }
 
-    // Camera setup
+    // Camera setup — zoom 1.45 so ~14-15 tiles height are visible
     this.cameras.main.setBounds(0, 0, 3840, 960);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setZoom(1);
+    this.cameras.main.setZoom(1.45);
 
     // Weather: Heavy Rain Layer
     this.createRainSystem();
@@ -87,6 +95,90 @@ export class GameScene extends Phaser.Scene {
 
     // Periodic lightning flash (every 20 - 40s)
     this.scheduleLightning();
+  }
+
+  initMissionObjectives() {
+    const m1Config = {
+      id: 'm1',
+      title: 'IRON TIDE',
+      totalIntel: 3,
+      primary: [
+        {
+          id: 'infiltrate_yard',
+          text: 'Infiltrate naval yard via rooftop rappel',
+          completed: true,
+          targetX: 200,
+          targetY: 280
+        },
+        {
+          id: 'hack_terminal',
+          text: 'Hack security terminal for vault code',
+          completed: false,
+          targetX: 1200,
+          targetY: 504,
+          radioOnComplete: {
+            speaker: 'CONTROL // HQ COMMS',
+            text: 'Vault code acquired. The cargo manifest is on the manager desk in the warehouse. Use your camera gadget to photograph it.'
+          }
+        },
+        {
+          id: 'photo_manifest',
+          text: 'Photograph shipment manifest on manager desk',
+          completed: false,
+          targetX: 1850,
+          targetY: 504,
+          radioOnComplete: {
+            speaker: 'CONTROL // HQ COMMS',
+            text: 'Manifest confirmed! High-value asset Dr. Meera Sen is being held in the interrogation room ahead. Rescue her immediately!'
+          }
+        },
+        {
+          id: 'rescue_meera',
+          text: 'Rescue Dr. Meera Sen from interrogation',
+          completed: false,
+          targetX: 1380,
+          targetY: 504,
+          radioOnComplete: {
+            speaker: 'DR. MEERA SEN // INFORMANT',
+            text: 'Ghost, thank God! They are preparing to load the guidance chip. Plant a tracker on the cargo container before we exfiltrate!'
+          }
+        },
+        {
+          id: 'plant_tracker',
+          text: 'Plant tracker beacon on naval cargo container',
+          completed: false,
+          targetX: 3200,
+          targetY: 704,
+          radioOnComplete: {
+            speaker: 'CONTROL // HQ COMMS',
+            text: 'Tracker beacon active! Extraction helicopter is inbound to the docks. Get Dr. Sen to the pier and extract!'
+          }
+        },
+        {
+          id: 'extract',
+          text: 'Extract with Dr. Meera Sen by helicopter at docks',
+          completed: false,
+          targetX: 3450,
+          targetY: 680
+        }
+      ],
+      secondary: [
+        { id: 'sec_alarms', type: 'no_alarms', text: 'No Alarms Raised (Ghost Rating)' },
+        { id: 'sec_kills', type: 'no_kills', text: 'No Lethal Casualties' },
+        { id: 'sec_intel', type: 'intel', text: 'Collect 3 Classified Intel Files', targetCount: 3 },
+        { id: 'sec_cameras', type: 'cameras', text: 'Disable 4 Surveillance Cameras', targetCount: 4 },
+        { id: 'sec_time', type: 'time_limit', text: 'Complete Infiltration Under 12 Minutes', seconds: 720 }
+      ]
+    };
+
+    this.objectives = new ObjectiveManager(this, m1Config);
+
+    this.time.delayedCall(1200, () => {
+      this.radio.queue({
+        speaker: 'CONTROL // HQ COMMS',
+        text: 'Ghost, you are on the roof. Infiltrate the office floor and hack the security terminal for the vault code.'
+      });
+    });
   }
 
   // ==========================================
@@ -120,12 +212,23 @@ export class GameScene extends Phaser.Scene {
       this.bgCranes.fillRect(x + 40, 125, 2, 80);
     }
 
-    // Near structures parallax
-    this.bgStructures = this.add.graphics().setScrollFactor(0.5);
-    this.bgStructures.fillStyle(0x111827, 0.95);
-    this.bgStructures.fillRect(0, 240, 800, 700);
-    this.bgStructures.fillRect(1100, 200, 1400, 750);
-    this.bgStructures.fillRect(2700, 320, 1140, 640);
+    // High-Detail Panoramic Backdrops (NO EMPTY VOID — Full 760px Vertical Span)
+    if (this.textures.exists('bg_rooftop')) {
+      const bgRoof = this.add.image(420, 380, 'bg_rooftop').setDepth(-20);
+      bgRoof.setDisplaySize(900, 760);
+    }
+    if (this.textures.exists('bg_office')) {
+      const bgOff = this.add.image(1300, 420, 'bg_office').setDepth(-20);
+      bgOff.setDisplaySize(1100, 760);
+    }
+    if (this.textures.exists('bg_warehouse')) {
+      const bgWh = this.add.image(2350, 440, 'bg_warehouse').setDepth(-20);
+      bgWh.setDisplaySize(1100, 760);
+    }
+    if (this.textures.exists('bg_harbor')) {
+      const bgDk = this.add.image(3550, 460, 'bg_harbor').setDepth(-20);
+      bgDk.setDisplaySize(1400, 760);
+    }
 
     // =======================================================
     // SECTION A & B: OFFICE ROOFTOP (x: 0 to 800, y: 300)
@@ -155,18 +258,11 @@ export class GameScene extends Phaser.Scene {
     const guardB = new Guard(this, 500, 284, { type: 'dock', patrolLeftX: 380, patrolRightX: 580 });
     this.guards.add(guardB);
 
-    // Tutorial World Floating Prompts (Section A / B)
-    this.addWorldPrompt(120, 270, 'MOVE: ← / →  •  SNEAK: SHIFT  •  JUMP: SPACE');
-    this.addWorldPrompt(280, 230, 'SHADOW ZONE: WATCH LIGHT METER DROP BEHIND TANK');
-    this.addWorldPrompt(580, 230, 'SHOOT LAMP [K] TO CREATE DARK PATH PAST CAMERA');
-    this.addWorldPrompt(680, 280, 'SNEAK UP BEHIND GUARD [J] TAKEDOWN');
-
     // Roof Hatch (Ladder down to Section C) -> CHECKPOINT 1
     this.createLadder(720, 300, 14); // ladder down 14 tiles (224px)
     this.addCheckpointBeacon(720, 290, 1);
 
     // EXTRA MECHANIC 1: ZIP LINE from Office Roof to Cargo Warehouse Roof!
-    // Start at (480, 280), cable spans to (1200, 280)
     this.zipLineA = new ZipLine(this, 480, 280, 1200, 280);
 
     // =======================================================
@@ -183,7 +279,6 @@ export class GameScene extends Phaser.Scene {
 
     // Overhead PIPE above laser tripwire for pipe-hang
     this.createPipeRun(880, 440, 120);
-    this.addWorldPrompt(940, 425, 'JUMP TO PIPE [↑] HANG & MOVE HAND-OVER-HAND');
 
     // Pulsing Laser Tripwire across corridor
     this.laserC = new LaserTripwire(this, 940, 460, 940, 520, { isPulsing: true, pulseCycle: 1.5 });
@@ -211,12 +306,21 @@ export class GameScene extends Phaser.Scene {
     this.interactiveItems.push(this.terminalC);
     this.addCheckpointBeacon(1200, 504, 2);
 
+    // Dr. Meera Sen (Inside Informant) in Security Interrogation Room
+    this.meera = new MeeraSen(this, 1380, 500);
+    this.interactiveItems.push({
+      x: 1380,
+      y: 504,
+      promptText: '[F] RESCUE DR. SEN',
+      onInteract: () => {
+        this.meera.rescue();
+      }
+    });
+
     // EXTRA MECHANIC 2: VENT CRAWL SHORTCUT (Section C)
-    // Floor vent at 860 leads into tight crawlspace running above office to 1240
     this.floorVentC = new VentEntrance(this, 860, 514, 880, 390);
     this.interactiveItems.push(this.floorVentC);
     this.createSolidBlock(860, 400, 380, 16, 12); // Vent duct ceiling/floor
-    // Vent exit back down to office corridor past the lasers
     this.ventExit = {
       type: 'vent_exit',
       exitX: 1240,
@@ -232,6 +336,23 @@ export class GameScene extends Phaser.Scene {
     this.createOneWayPlatform(1450, 600, 320);
     this.createOneWayPlatform(1850, 520, 300);
     this.createOneWayPlatform(2200, 600, 360);
+
+    // Warehouse Manager Desk with Manifest Document
+    const desk = this.add.image(1850, 512, 'desk').setDepth(45);
+    const docManifest = this.add.image(1850, 500, 'doc_manifest').setDepth(46);
+    this.interactiveItems.push({
+      x: 1850,
+      y: 504,
+      promptText: '[F] PHOTO MANIFEST',
+      onInteract: () => {
+        if (this.manifestPhotographed) return;
+        this.manifestPhotographed = true;
+        audioSystem.playTerminalBeep(1200);
+        this.cameras.main.flash(200, 255, 255, 255);
+        docManifest.setTint(0x10b981);
+        this.objectives.completePrimary('photo_manifest');
+      }
+    });
 
     // Crate stacks (ledge-grab climbing route)
     this.createCrateStack(1500, 696, 3, 2);
@@ -292,6 +413,13 @@ export class GameScene extends Phaser.Scene {
     this.createWaterHazard(2950, 740, 160, 40);
     // Continuing pier
     this.createSolidBlock(3110, 720, 400, 32, 8);
+    // Deep harbor ocean water under and around pier
+    this.createWaterHazard(2550, 752, 1600, 120);
+    // Wooden dock pilings under piers extending into water
+    for (let px = 2640; px < 3500; px += 70) {
+      if (px > 2920 && px < 3130) continue; // water gap
+      this.add.tileSprite(px, 775, 14, 70, 'tiles', 8).setDepth(20);
+    }
 
     // Overhead dock beams for pipe hanging under chatting guards
     this.createPipeRun(2800, 710, 220);
@@ -300,6 +428,28 @@ export class GameScene extends Phaser.Scene {
     this.createContainer(2680, 704, 'container_teal');
     this.createContainer(2744, 704, 'container_rust');
     this.createContainer(3200, 704, 'container_navy');
+
+    // Container Tracker Beacon Socket (Mission 1 Objective)
+    const trackerBeacon = this.add.image(3200, 690, 'tracker_beacon').setDepth(46).setAlpha(0.35);
+    this.interactiveItems.push({
+      x: 3200,
+      y: 704,
+      promptText: '[F] PLANT TRACKER',
+      onInteract: () => {
+        if (this.trackerPlanted) return;
+        this.trackerPlanted = true;
+        trackerBeacon.setAlpha(1.0);
+        audioSystem.playTerminalBeep(1100);
+        this.tweens.add({
+          targets: trackerBeacon,
+          alpha: 0.35,
+          duration: 350,
+          yoyo: true,
+          repeat: -1
+        });
+        this.objectives.completePrimary('plant_tracker');
+      }
+    });
 
     // 2 Dock Guards talking on the pier (poncho, helmet, SMG)
     const guardE1 = new Guard(this, 2860, 704, { type: 'dock', patrolLeftX: 2850, patrolRightX: 2870 });
@@ -324,12 +474,22 @@ export class GameScene extends Phaser.Scene {
     // Black rope ladder hanging from helicopter
     this.ropeLadder = this.add.rectangle(3460, 645, 4, 60, 0x1e293b).setDepth(105);
 
-    this.extractionPrompt = this.add.text(3460, 690, '[J] GRAB EXTRACTION ROPE', {
-      fontFamily: 'Share Tech Mono, monospace',
-      fontSize: '9px',
-      color: '#38bdf8',
-      backgroundColor: '#070b14'
-    }).setOrigin(0.5).setDepth(200);
+    this.interactiveItems.push({
+      x: 3460,
+      y: 680,
+      promptText: '[SPACE] BOARD HELICOPTER',
+      onInteract: () => {
+        if (this.objectives && this.objectives.primary.slice(0, 5).every(o => o.completed)) {
+          this.objectives.completePrimary('extract');
+          this.startExtractionSequence();
+        } else {
+          audioSystem.playTerminalBeep(250);
+          if (this.hud) {
+            this.hud.showRadioBox({ speaker: 'CONTROL', text: 'Negative Ghost! Primary objectives remain incomplete.' });
+          }
+        }
+      }
+    });
 
     // QTE prompt text (Helicopter Skid Hang)
     this.qteText = this.add.text(240, 80, 'PRESS [SPACE / JUMP] TO PULL UP ONTO SKID!', {
@@ -438,13 +598,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   addWorldPrompt(x, y, text) {
-    this.add.text(x, y, text, {
-      fontFamily: 'Share Tech Mono, monospace',
-      fontSize: '7px',
-      color: '#94a3b8',
-      backgroundColor: 'rgba(7, 11, 18, 0.85)',
-      padding: { x: 4, y: 2 }
-    }).setOrigin(0.5).setDepth(160);
+    // Replaced by contextual HUD key-icon prompts above player
   }
 
   addCheckpointBeacon(x, y, cpIndex) {
@@ -519,19 +673,19 @@ export class GameScene extends Phaser.Scene {
   // ==========================================
   createRainSystem() {
     this.rainDrops = [];
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 90; i++) {
       const drop = this.add.rectangle(
-        Phaser.Math.Between(0, 480),
-        Phaser.Math.Between(-20, 270),
+        Phaser.Math.Between(0, 660),
+        Phaser.Math.Between(-20, 380),
         1,
-        Phaser.Math.Between(8, 16),
+        Phaser.Math.Between(8, 18),
         0x38bdf8,
         0.35
       ).setScrollFactor(0).setDepth(200);
 
       this.tweens.add({
         targets: drop,
-        y: 280,
+        y: 390,
         x: drop.x + 35,
         duration: Phaser.Math.Between(260, 420),
         repeat: -1,
@@ -846,7 +1000,8 @@ export class GameScene extends Phaser.Scene {
   // SCENE UPDATE LOOP
   // ==========================================
   update(time, delta) {
-    this.missionTimer += delta / 1000;
+    const dt = delta / 1000;
+    this.missionTimer += dt;
     this.inputManager.update();
 
     // Check pause [P / Esc]
@@ -855,6 +1010,11 @@ export class GameScene extends Phaser.Scene {
       this.scene.launch('PauseScene');
       return;
     }
+
+    // Update Objectives, Radio, and Escort NPC
+    if (this.objectives) this.objectives.update(dt);
+    if (this.radio) this.radio.update(dt);
+    if (this.meera) this.meera.update(time, delta);
 
     // Update Player & Systems
     this.player.update(time, delta, this.inputManager.state);
@@ -873,7 +1033,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Check Zipline proximity trigger
-    if (this.zipLineA && Phaser.Math.Distance.Between(this.player.x, this.player.y, this.zipLineA.startX, this.zipLineA.startY) < 24) {
+    if (this.zipLineA && Phaser.Math.Distance.Between(this.player.x, this.player.y, this.zipLineA.startX, this.zipLineA.startY) < 28) {
       this.zipLineA.showPrompt(true);
       if (this.inputManager.state.actionJustPressed) {
         this.player.startZipLine(this.zipLineA);
@@ -887,23 +1047,13 @@ export class GameScene extends Phaser.Scene {
       this.checkDockAmbush();
     }
 
-    // Update HUD meters & weapon system UI
-    if (this.hud) {
-      this.hud.updateTimer(this.missionTimer);
-      this.hud.updateLight(this.stealth.playerVisibility);
-      this.hud.updateThermal(this.player.thermalActive, this.player.thermalTimer, this.player.thermalCooldown);
-      if (this.player && this.player.weapons) {
-        this.hud.updateWeaponUI(this.player.weapons.getHUDData());
-      }
-    }
-
     // Render lighting darkness overlay
     this.renderDarknessOverlay();
   }
 
   updateInteractiveProximity() {
     let nearest = null;
-    let minDist = 32;
+    let minDist = 36;
 
     for (const item of this.interactiveItems) {
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y);
@@ -922,20 +1072,29 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.player.currentInteractive = nearest;
+
+    if (nearest && this.hud) {
+      this.hud.showPrompt(nearest.x, nearest.y - 24, nearest.promptText || '[F] INTERACT');
+    } else if (this.hud) {
+      this.hud.hidePrompt();
+    }
   }
 
   renderDarknessOverlay() {
     this.lightingOverlay.clear();
-    // Night darkness layer
-    const darknessColor = this.isLockdown ? 0x220505 : 0x05070c;
-    const darknessAlpha = 0.55;
+    const cam = this.cameras.main;
+    // Ambient level ~45% (tinted moody night blue) per Phase 1.4
+    const darknessColor = this.isLockdown ? 0x220505 : 0x061122;
+    const darknessAlpha = 0.35;
 
     this.lightingOverlay.fillStyle(darknessColor, darknessAlpha);
+    const viewW = (cam.width / cam.zoom) + 60;
+    const viewH = (cam.height / cam.zoom) + 60;
     this.lightingOverlay.fillRect(
-      this.cameras.main.scrollX,
-      this.cameras.main.scrollY,
-      480,
-      270
+      cam.scrollX - 30,
+      cam.scrollY - 30,
+      viewW,
+      viewH
     );
   }
 

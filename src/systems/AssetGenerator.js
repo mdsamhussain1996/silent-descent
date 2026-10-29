@@ -10,6 +10,7 @@ export class AssetGenerator {
 
     this.createGhostSprites(scene);
     this.createGuardSprites(scene);
+    this.createMeeraSprites(scene);
     this.createTileset(scene);
     this.createEntitiesTextures(scene);
     this.createWeaponsAndGadgetsTextures(scene);
@@ -499,6 +500,93 @@ export class AssetGenerator {
   }
 
   // =========================================================================
+  // DR. MEERA SEN — Inside Informant Escort Character (Frame: 28x44)
+  // =========================================================================
+  static createMeeraSprites(scene) {
+    const tm = scene.textures;
+    const w = 28;
+    const h = 44;
+
+    const drawMeera = (c, opt = {}) => {
+      const { crouch = false, walkFrame = 0 } = opt;
+      const yOff = crouch ? 12 : 0;
+
+      // Dark contour outline
+      c.fillStyle = '#060a12';
+      c.fillRect(9, 4 + yOff, 10, 24);
+
+      // Lab Coat Torso
+      c.fillStyle = '#e2e8f0';
+      c.fillRect(9, 13 + yOff, 10, 15);
+      c.fillStyle = '#cbd5e1';
+      c.fillRect(10, 14 + yOff, 2, 13);
+      c.fillRect(17, 14 + yOff, 2, 13);
+      // Dark turtleneck underneath
+      c.fillStyle = '#0f172a';
+      c.fillRect(12, 11 + yOff, 4, 5);
+
+      // Security ID badge
+      c.fillStyle = '#38bdf8';
+      c.fillRect(11, 16 + yOff, 2, 3);
+
+      // Head & Face (Indian complexion)
+      c.fillStyle = '#92400e';
+      c.fillRect(10, 5 + yOff, 8, 7);
+      c.fillStyle = '#b45309';
+      c.fillRect(11, 6 + yOff, 6, 5);
+
+      // Glasses
+      c.strokeStyle = '#38bdf8';
+      c.lineWidth = 1;
+      c.strokeRect(12, 7 + yOff, 2, 2);
+      c.strokeRect(15, 7 + yOff, 2, 2);
+
+      // Hair bun
+      c.fillStyle = '#090b0e';
+      c.fillRect(9, 3 + yOff, 10, 3);
+      c.fillRect(12, 1 + yOff, 4, 3); // hair bun top
+
+      // Legs / Slacks
+      if (crouch) {
+        c.fillStyle = '#0f172a';
+        c.fillRect(8, 28, 12, 8);
+        c.fillStyle = '#090c10';
+        c.fillRect(7, 36, 6, 4);
+      } else {
+        const legShift = Math.sin(walkFrame) * 4;
+        c.fillStyle = '#0f172a';
+        c.fillRect(10, 28, 3, 12 + legShift);
+        c.fillRect(15, 28, 3, 12 - legShift);
+        c.fillStyle = '#090c10';
+        c.fillRect(9, 40 + legShift, 4, 3);
+        c.fillRect(15, 40 - legShift, 4, 3);
+      }
+    };
+
+    // Idle
+    {
+      const { canvas, ctx } = this.makeCanvas(w, h);
+      drawMeera(ctx, { crouch: false });
+      if (tm.exists('meera_idle')) tm.remove('meera_idle');
+      scene.textures.addCanvas('meera_idle', canvas);
+    }
+    // Walk
+    {
+      const { canvas, ctx } = this.makeCanvas(w, h);
+      drawMeera(ctx, { crouch: false, walkFrame: 1 });
+      if (tm.exists('meera_walk')) tm.remove('meera_walk');
+      scene.textures.addCanvas('meera_walk', canvas);
+    }
+    // Crouch
+    {
+      const { canvas, ctx } = this.makeCanvas(w, h);
+      drawMeera(ctx, { crouch: true });
+      if (tm.exists('meera_crouch')) tm.remove('meera_crouch');
+      scene.textures.addCanvas('meera_crouch', canvas);
+    }
+  }
+
+  // =========================================================================
   // RICH TEXTURED 16x16 TILESET (No flat colors — bevels, rivets, rust, grain)
   // =========================================================================
   static createTileset(scene) {
@@ -773,6 +861,56 @@ export class AssetGenerator {
       if (tm.exists('icon_noisemaker')) tm.remove('icon_noisemaker');
       scene.textures.addCanvas('icon_noisemaker', canvas);
     }
+
+    // Camera Icon (20x16)
+    {
+      const { canvas, ctx } = this.makeCanvas(20, 16);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(2, 4, 16, 10);
+      ctx.fillRect(6, 2, 8, 2);
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(10, 9, 3, 0, Math.PI * 2);
+      ctx.fill();
+      if (tm.exists('icon_camera')) tm.remove('icon_camera');
+      scene.textures.addCanvas('icon_camera', canvas);
+    }
+
+    // EMP Icon (20x16)
+    {
+      const { canvas, ctx } = this.makeCanvas(20, 16);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(5, 3, 10, 10);
+      ctx.fillStyle = '#eab308';
+      ctx.fillRect(8, 5, 4, 6);
+      if (tm.exists('icon_emp')) tm.remove('icon_emp');
+      scene.textures.addCanvas('icon_emp', canvas);
+    }
+
+    // NVG Icon (20x16)
+    {
+      const { canvas, ctx } = this.makeCanvas(20, 16);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(3, 4, 14, 8);
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(5, 6, 4, 4);
+      ctx.fillRect(11, 6, 4, 4);
+      if (tm.exists('icon_nvg')) tm.remove('icon_nvg');
+      scene.textures.addCanvas('icon_nvg', canvas);
+    }
+
+    // Sniper Icon (32x18)
+    {
+      const { canvas, ctx } = this.makeCanvas(32, 18);
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(2, 6, 28, 3);
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(10, 3, 8, 3); // scope
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(6, 9, 4, 6); // stock
+      if (tm.exists('icon_sniper')) tm.remove('icon_sniper');
+      scene.textures.addCanvas('icon_sniper', canvas);
+    }
   }
 
   // =========================================================================
@@ -828,15 +966,26 @@ export class AssetGenerator {
       scene.textures.addCanvas('camera', canvas);
     }
 
-    // 3. Stenciled Kestrel Dynamics Cargo Crate (28x28)
+    // 3. Realistic Military Cargo Crate (28x28)
     {
       const { canvas, ctx } = this.makeCanvas(28, 28);
-      ctx.fillStyle = '#1a202c';
+      // Dark border
+      ctx.fillStyle = '#221508';
       ctx.fillRect(0, 0, 28, 28);
-      ctx.fillStyle = '#374151';
-      ctx.fillRect(2, 2, 24, 24);
-      // Steel cross bracing
-      ctx.strokeStyle = '#4b5563';
+      // Wood plank base
+      ctx.fillStyle = '#6b3e15';
+      ctx.fillRect(1, 1, 26, 26);
+      // Individual wood planks with shading
+      ctx.fillStyle = '#7d4a1b';
+      ctx.fillRect(2, 2, 24, 7);
+      ctx.fillRect(2, 10, 24, 8);
+      ctx.fillRect(2, 19, 24, 7);
+      // Plank division seams
+      ctx.fillStyle = '#3a200a';
+      ctx.fillRect(2, 9, 24, 1);
+      ctx.fillRect(2, 18, 24, 1);
+      // Diagonal wood brace
+      ctx.strokeStyle = '#532f10';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(3, 3);
@@ -844,11 +993,25 @@ export class AssetGenerator {
       ctx.moveTo(25, 3);
       ctx.lineTo(3, 25);
       ctx.stroke();
-      // Original company stencil: "KESTREL"
-      ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(6, 11, 16, 5);
-      ctx.fillStyle = '#111827';
-      ctx.fillRect(8, 12, 12, 3);
+      // Heavy metal corner brackets
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(1, 1, 6, 2);
+      ctx.fillRect(1, 1, 2, 6);
+      ctx.fillRect(21, 1, 6, 2);
+      ctx.fillRect(25, 1, 2, 6);
+      ctx.fillRect(1, 25, 6, 2);
+      ctx.fillRect(1, 21, 2, 6);
+      ctx.fillRect(21, 25, 6, 2);
+      ctx.fillRect(25, 21, 2, 6);
+      // Rivet glints
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(2, 2, 1, 1);
+      ctx.fillRect(25, 2, 1, 1);
+      ctx.fillRect(2, 25, 1, 1);
+      ctx.fillRect(25, 25, 1, 1);
+      // Covert cargo marking
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(10, 12, 8, 4);
       if (tm.exists('crate')) tm.remove('crate');
       scene.textures.addCanvas('crate', canvas);
     }
@@ -1007,6 +1170,31 @@ export class AssetGenerator {
       if (tm.exists('ammo_clip')) tm.remove('ammo_clip');
       scene.textures.addCanvas('ammo_clip', ca);
 
+      // Document Manifest (18x20)
+      const { canvas: cdm, ctx: ctxdm } = this.makeCanvas(18, 20);
+      ctxdm.fillStyle = '#78350f';
+      ctxdm.fillRect(1, 1, 16, 18); // clipboard
+      ctxdm.fillStyle = '#f8fafc';
+      ctxdm.fillRect(3, 3, 12, 14); // paper
+      ctxdm.fillStyle = '#0284c7';
+      ctxdm.fillRect(4, 5, 8, 2); // Kestrel header
+      ctxdm.fillStyle = '#64748b';
+      ctxdm.fillRect(4, 9, 10, 1);
+      ctxdm.fillRect(4, 12, 7, 1);
+      ctxdm.fillStyle = '#10b981';
+      ctxdm.fillRect(12, 12, 3, 3); // stamp
+      if (tm.exists('doc_manifest')) tm.remove('doc_manifest');
+      scene.textures.addCanvas('doc_manifest', cdm);
+
+      // Tracker Beacon (16x16)
+      const { canvas: ctb, ctx: ctxtb } = this.makeCanvas(16, 16);
+      ctxtb.fillStyle = '#0f172a';
+      ctxtb.fillRect(3, 4, 10, 8);
+      ctxtb.fillStyle = '#38bdf8';
+      ctxtb.fillRect(6, 6, 4, 4); // glowing cyan diode
+      if (tm.exists('tracker_beacon')) tm.remove('tracker_beacon');
+      scene.textures.addCanvas('tracker_beacon', ctb);
+
       // Lamp Post (16x32) & Broken
       const { canvas: clp, ctx: ctxlp } = this.makeCanvas(16, 32);
       ctxlp.fillStyle = '#334155';
@@ -1097,8 +1285,8 @@ export class AssetGenerator {
   static createHUDTextures(scene) {
     const tm = scene.textures;
 
-    // Vikram "Ghost" Rao Portrait (32x32)
-    {
+    // Vikram "Ghost" Rao Portrait (32x32 fallback if image missing)
+    if (!tm.exists('portrait_ghost')) {
       const { canvas, ctx } = this.makeCanvas(32, 32);
       ctx.fillStyle = '#06090e';
       ctx.fillRect(0, 0, 32, 32);
@@ -1118,12 +1306,11 @@ export class AssetGenerator {
       // Webbing collar
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(5, 24, 22, 8);
-      if (tm.exists('portrait_ghost')) tm.remove('portrait_ghost');
       scene.textures.addCanvas('portrait_ghost', canvas);
     }
 
-    // Control HQ Portrait (32x32)
-    {
+    // Control HQ Portrait (32x32 fallback if image missing)
+    if (!tm.exists('portrait_control')) {
       const { canvas, ctx } = this.makeCanvas(32, 32);
       ctx.fillStyle = '#051928';
       ctx.fillRect(0, 0, 32, 32);
@@ -1138,7 +1325,6 @@ export class AssetGenerator {
       ctx.fillRect(8, 17, 10, 2);
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(18, 16, 4, 4);
-      if (tm.exists('portrait_control')) tm.remove('portrait_control');
       scene.textures.addCanvas('portrait_control', canvas);
     }
 

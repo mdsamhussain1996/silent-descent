@@ -1,5 +1,7 @@
+// src/scenes/MissionFailed.js
+// Tactical Mission Failure Screen
+
 import Phaser from 'phaser';
-import { SaveSystem } from '../systems/Save.js';
 
 export class MissionFailedScene extends Phaser.Scene {
   constructor() {
@@ -7,100 +9,91 @@ export class MissionFailedScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.reason = data.reason || 'Agent compromised.';
+    this.reason = data.reason || 'Agent compromised in the field.';
+    this.missionId = data.missionId || 'm1';
   }
 
   create() {
-    const cx = 240;
-    const cy = 135;
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+    const cx = w / 2;
+    const cy = h / 2;
 
     // Dark red alarm failure screen
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x1a0505, 0x0f0404, 0x080202, 0x050101, 1);
-    bg.fillRect(0, 0, 480, 270);
+    bg.fillGradientStyle(0x1e0606, 0x120303, 0x090202, 0x050101, 1);
+    bg.fillRect(0, 0, w, h);
 
     // Frame
     bg.lineStyle(1.5, 0xef4444, 0.8);
-    bg.strokeRect(20, 15, 440, 240);
+    bg.strokeRect(20, 15, w - 40, h - 30);
 
     // Header
-    this.add.text(cx, 55, 'MISSION FAILED', {
+    this.add.text(cx, cy - 80, 'MISSION COMPROMISED', {
       fontFamily: 'Rajdhani, sans-serif',
-      fontSize: '28px',
+      fontSize: '32px',
       fontStyle: 'bold',
       color: '#ef4444',
       letterSpacing: 4
     }).setOrigin(0.5);
 
-    this.add.text(cx, 85, 'OPERATION ABORTED // CRITICAL COMPROMISE', {
+    this.add.text(cx, cy - 44, 'OPERATION ABORTED // TACTICAL FAILURE', {
       fontFamily: 'Share Tech Mono, monospace',
-      fontSize: '9px',
+      fontSize: '11px',
       color: '#f87171'
     }).setOrigin(0.5);
 
     // Reason
-    this.add.text(cx, 120, this.reason.toUpperCase(), {
+    const reasonBox = this.add.graphics();
+    reasonBox.fillStyle(0x0a0303, 0.8);
+    reasonBox.fillRect(cx - 200, cy - 25, 400, 40);
+    reasonBox.lineStyle(1, 0xef4444, 0.5);
+    reasonBox.strokeRect(cx - 200, cy - 25, 400, 40);
+
+    this.add.text(cx, cy - 5, this.reason.toUpperCase(), {
       fontFamily: 'Share Tech Mono, monospace',
-      fontSize: '10px',
-      color: '#cbd5e1'
-    }).setOrigin(0.5);
-
-    const cp = SaveSystem.getCheckpoint();
-
-    // Checkpoint button
-    const btnStartY = 160;
-    if (cp) {
-      const cpBtn = this.add.rectangle(cx, btnStartY, 220, 22, 0x0284c7)
-        .setStrokeStyle(1, 0x38bdf8)
-        .setInteractive({ useHandCursor: true });
-      this.add.text(cx, btnStartY, `RESTORE CHECKPOINT ${cp.checkpoint} [SPACE]`, {
-        fontFamily: 'Rajdhani, sans-serif',
-        fontSize: '11px',
-        fontStyle: 'bold',
-        color: '#ffffff'
-      }).setOrigin(0.5);
-
-      cpBtn.on('pointerdown', () => this.restoreCheckpoint());
-      this.input.keyboard.on('keydown-SPACE', () => this.restoreCheckpoint());
-    }
-
-    // Restart Mission button
-    const restartY = cp ? btnStartY + 30 : btnStartY;
-    const restartBtn = this.add.rectangle(cx, restartY, 220, 22, 0x1e293b)
-      .setStrokeStyle(1, 0x475569)
-      .setInteractive({ useHandCursor: true });
-    this.add.text(cx, restartY, 'RESTART FULL MISSION [R]', {
-      fontFamily: 'Rajdhani, sans-serif',
       fontSize: '11px',
-      fontStyle: 'bold',
-      color: '#cbd5e1'
+      color: '#ffffff',
+      wordWrap: { width: 380 },
+      align: 'center'
     }).setOrigin(0.5);
 
-    restartBtn.on('pointerdown', () => this.restartMission());
-    this.input.keyboard.on('keydown-R', () => this.restartMission());
-
-    // Main Menu button
-    const menuY = restartY + 30;
-    const menuBtn = this.add.rectangle(cx, menuY, 220, 20, 0x0f172a)
-      .setStrokeStyle(1, 0x334155)
+    // Retry Mission button
+    const retryBtn = this.add.rectangle(cx, cy + 45, 240, 26, 0x0284c7, 0.95)
+      .setStrokeStyle(1, 0x38bdf8)
       .setInteractive({ useHandCursor: true });
-    this.add.text(cx, menuY, 'ABORT TO MAIN MENU [ESC]', {
+
+    this.add.text(cx, cy + 45, 'RESTART INFILTRATION [SPACE]', {
       fontFamily: 'Rajdhani, sans-serif',
-      fontSize: '10px',
+      fontSize: '13px',
       fontStyle: 'bold',
-      color: '#94a3b8'
+      color: '#ffffff'
     }).setOrigin(0.5);
 
-    menuBtn.on('pointerdown', () => this.scene.start('TitleScene'));
-    this.input.keyboard.on('keydown-ESC', () => this.scene.start('TitleScene'));
-  }
+    // Abort to Campaign Map button
+    const abortBtn = this.add.rectangle(cx, cy + 85, 240, 24, 0x1e293b, 0.9)
+      .setStrokeStyle(1, 0xef4444)
+      .setInteractive({ useHandCursor: true });
 
-  restoreCheckpoint() {
-    this.scene.start('GameScene', { fromCheckpoint: true });
-  }
+    this.add.text(cx, cy + 85, 'ABORT TO CAMPAIGN MAP [ESC]', {
+      fontFamily: 'Share Tech Mono, monospace',
+      fontSize: '11px',
+      color: '#ef4444'
+    }).setOrigin(0.5);
 
-  restartMission() {
-    SaveSystem.clearCheckpoint();
-    this.scene.start('IntroScene');
+    const restart = () => {
+      this.scene.start('GameScene', { mission: { id: this.missionId, num: 1 } });
+    };
+
+    const abort = () => {
+      this.scene.start('CampaignMapScene');
+    };
+
+    retryBtn.on('pointerdown', restart);
+    abortBtn.on('pointerdown', abort);
+
+    this.input.keyboard.on('keydown-SPACE', restart);
+    this.input.keyboard.on('keydown-ENTER', restart);
+    this.input.keyboard.on('keydown-ESC', abort);
   }
 }
