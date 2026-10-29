@@ -86,15 +86,15 @@ export class TitleScene extends Phaser.Scene {
     });
 
     // Title text
-    const titleText = this.add.text(cx - 60, 48, 'SILENT DESCENT', {
+    const titleText = this.add.text(cx - 60, 48, 'NO TRACE', {
       fontFamily: 'Rajdhani, sans-serif',
-      fontSize: '28px',
+      fontSize: '32px',
       fontStyle: 'bold',
       color: '#f8fafc',
-      letterSpacing: 3
+      letterSpacing: 4
     }).setOrigin(0.5);
 
-    this.add.text(cx - 60, 72, 'LEVEL 1 : "IRON TIDE" // NIGHTFALL PROTOCOL', {
+    this.add.text(cx - 60, 74, 'LEVEL 1 : "IRON TIDE" // COVERT TACTICAL ACTION', {
       fontFamily: 'Share Tech Mono, monospace',
       fontSize: '9px',
       color: '#f59e0b',

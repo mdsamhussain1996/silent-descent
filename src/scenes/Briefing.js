@@ -20,7 +20,7 @@ export class BriefingScene extends Phaser.Scene {
     bg.fillStyle(0x0f172a, 1);
     bg.fillRect(11, 11, 458, 22);
 
-    this.add.text(20, 16, 'NIGHTFALL DIRECTIVE // OPERATION IRON TIDE', {
+    this.add.text(20, 16, 'NO TRACE PROTOCOL // OPERATION IRON TIDE', {
       fontFamily: 'Rajdhani, sans-serif',
       fontSize: '12px',
       fontStyle: 'bold',
@@ -37,7 +37,7 @@ export class BriefingScene extends Phaser.Scene {
     // Content: Left column (Mission Dossier)
     const dossier = [
       'OPERATIVE: Vikram "Ghost" Rao',
-      'AGENCY: NIGHTFALL Strategic Recon',
+      'AGENCY: NO TRACE Strategic Division',
       'TARGET: Kestrel Dynamics Harbour Hub',
       '',
       'PRIMARY OBJECTIVE:',
@@ -62,24 +62,24 @@ export class BriefingScene extends Phaser.Scene {
 
     // Content: Right column (Tactical Controls & Gadgets)
     const controls = [
-      'TACTICAL CONTROLS & GADGETS:',
+      'TACTICAL ARSENAL & CONTROLS:',
       '← / → : Move / Sneak / Sprint',
-      '↑ / ↓ : Climb / Crouch / Wall-Press / Peek',
+      '↑ / ↓ : Climb / Crouch Cover / Wall-Press',
       'SPACE : Jump / Ledge Pull Up',
-      'SHIFT : Sneak (Silent, lower visibility)',
-      'J     : Takedown (Behind) / Interact / Hack',
-      'K     : Silenced Pistol (Aim with ↑ / ↓)',
-      'L     : Grab Guard (Use on hand scanners)',
+      'J     : Takedown / Interact / Hack',
+      'K / LMB: Fire Weapon (Green Laser Sight)',
+      'Q / E : Cycle Arsenal (Pistol/SMG/Shotgun)',
+      'R     : Tactical Reload',
+      'G     : Deploy Gadget (Taser / Noise Lure)',
       'V     : Thermal Visor (6s duration, 10s CD)',
-      '',
-      'TOUCH : On-screen D-Pad & Action Buttons'
+      'TOUCH : On-screen Virtual Tactical Buttons'
     ];
 
     controls.forEach((line, idx) => {
       this.add.text(240, 44 + idx * 12, line, {
         fontFamily: 'Share Tech Mono, monospace',
         fontSize: '8px',
-        color: idx === 0 ? '#38bdf8' : (line.startsWith('V') ? '#fbbf24' : '#cbd5e1')
+        color: idx === 0 ? '#38bdf8' : (line.startsWith('V') || line.startsWith('Q') ? '#fbbf24' : '#cbd5e1')
       });
     });
 

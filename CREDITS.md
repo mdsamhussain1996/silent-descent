@@ -1,35 +1,41 @@
-# CREDITS — SILENT DESCENT: LEVEL 1 "IRON TIDE"
+# CREDITS — NO TRACE: LEVEL 1 "IRON TIDE"
 
 ## Original Concept & Game Design
-- **Original IP & Game**: *Silent Descent*
+- **Original IP & Game**: *NO TRACE* (Formerly *Silent Descent*)
 - **Level**: Level 1 "Iron Tide"
 - **Operative**: Vikram "Ghost" Rao
-- **Agency**: NIGHTFALL Unit
+- **Agency**: NO TRACE Strategic Division
 - **Adversary Corporation**: Kestrel Dynamics
 
-## Aesthetics & Art Style
-- Inspired by classic 2000s Gameloft mobile spy 2D stealth-action games (e.g. Splinter Cell Java/Symbian editions).
+## Aesthetics & Pixel Art Style
+- Inspired by classic 2000s mobile spy 2D stealth-action games (e.g. *Splinter Cell: Conviction* mobile editions).
 - **100% Original Procedural Pixel Art**:
-  - Authored dynamically via HTML5 Canvas 2D buffers adhering strictly to a curated 32-color industrial night palette (`#05070c`, `#1e2430`, `#f59e0b`, `#38bdf8`, `#ef4444`, etc.).
-  - Ghost Operative: 24×32 frames (idle, tactical walk, sneak, sprint, jump, fall, ledge grab & climb, pipe hang & hand-over-hand, rope rappel, ladder, wall-press, silenced pistol aim & shoot, elbow strike knockout, guard grab, body drag, zip-line slide, vent crawl).
-  - Kestrel Yard & Office Guards: poncho, combat helmets, flashlights, security caps, patrol, suspicious '?', alert '!', knockout ragdoll.
-  - Environment Tiles & Props: industrial metal plates, hazard stripes, one-way catwalks, ladders, pipes, wet docks, water hazard, water tank, AC units, crates, security cameras, laser tripwires, sodium lamps, security terminals, floor vents, zip line cable, and NIGHTFALL "Kite" stealth helicopter.
+  - Authored dynamically via HTML5 Canvas 2D buffers adhering strictly to a curated 48–64 color master palette (night blues/teals, wet steel greys, sodium lamp orange, interior mahogany, cyan monitor glow, and alert reds).
+  - 1px dark contour outlines, 3–4 shade ramps, and hand-placed highlights on all sprites and textured 16px tiles (rivets, scratches, grime, panel seams).
+  - Operative Ghost: 28×40 detailed frames with tactical webbing, backpack, visible holster, and glowing amber monocular visor.
+  - 3 Original Guard Types: Dock Guard (olive poncho, helmet, SMG), Office Guard (blue shirt, security cap, pistol), Heavy Guard (ballistic armor, riot helmet, shotgun).
+  - Environment Tiles & Props: concrete rooftop with lamp puddle reflections, AC units with spinning fan blades, mahogany wainscoting office, framed paintings, wall sconces, industrial hazard catwalks, stenciled KESTREL crates, corrugated shipping containers (teal, rust, navy), and emergency extraction helicopter.
 
-## Audio & Music
+## Weapons & Gadgets Audio
 - **Procedural WebAudio Synthesizer Engine** (`src/systems/Audio.js`):
+  - Suppressed pistol shot ("thwip!")
+  - Suppressed SMG rapid 9/s burst
+  - Heavy shotgun pump and explosive blast
+  - High-voltage stun taser electric arc zap
+  - Sticky noise maker lure audio ping
+  - Bouncing brass shell casing clicks
+  - Bullet impact sparks, wood splintering, and concrete hits
   - Rain ambient loop with low-pass frequency filtering
   - Distant thunder rumble
   - Helicopter rotor thrum with distance attenuation
   - Dynamic stealth footsteps (soft sneak vs. loud running click)
-  - Suppressed pistol shot ("thwip!")
-  - Sodium light bulb pop and shattering glass tinkle
-  - High-voltage laser tripwire electric hum
+  - Sodium light bulb pop and shattering glass
+  - High-voltage laser tripwire hum
   - Facility alarm siren wail
-  - Radio codec chatter blips
-  - Dynamic adaptive stealth bassline that escalates through suspicion levels ('?' to '!') and triggers alert percussion drums.
+  - Adaptive stealth bassline and combat alert percussion drums.
 
 ## Frameworks & Tools
 - Phaser 3 (pinned version 3.87.0)
-- Vite (ES modules)
+- Vite 5 (ES modules)
 - Arcade Physics
 - Google Fonts (`Share Tech Mono`, `Rajdhani`)

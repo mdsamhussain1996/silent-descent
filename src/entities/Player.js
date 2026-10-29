@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { audioSystem } from '../systems/Audio.js';
+import { WeaponManager, WEAPON_TYPES, GADGET_TYPES } from '../systems/Weapons.js';
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
@@ -7,17 +8,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // Physics Hitbox: 10x28 centered in 24x32
-    this.body.setSize(10, 28);
-    this.body.setOffset(7, 4);
+    // Physics Hitbox: 12x32 centered in 28x40 frame
+    this.body.setSize(12, 32);
+    this.body.setOffset(8, 8);
     this.body.setGravityY(900);
     this.setDepth(100);
 
     // Stats
     this.hp = 100;
     this.maxHp = 100;
-    this.ammo = 6;
-    this.maxAmmo = 12;
     this.intelCount = 0;
     this.hasDataDrive = false;
     this.lightsShot = 0;
@@ -29,7 +28,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.SPEED_SNEAK = 35;
     this.SPEED_RUN = 110;
     this.SPEED_PIPE = 40;
-    this.JUMP_VELOCITY = -318; // ~3.5 tiles (56px) at 900 gravity
+    this.JUMP_VELOCITY = -318;
 
     // Timers
     this.coyoteTimer = 0;
@@ -38,11 +37,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.isFalling = false;
     this.footstepTimer = 0;
 
-    // State machine:
-    // 'normal', 'sneak', 'ledge_grab', 'ledge_climb', 'pipe_hang',
-    // 'rope_slide', 'ladder', 'wall_press', 'zipline', 'vent_crawl',
-    // 'grab_guard', 'drag_body', 'hurt', 'dead'
-    this.state = 'normal';
+    // State machine
+    this.state = 'normal'; // 'normal', 'sneak', 'cover', 'ledge_grab', 'ledge_climb', 'pipe_hang', 'rope_slide', 'ladder', 'wall_press', 'zipline', 'vent_crawl', 'knockout', 'grab_guard', 'drag_body', 'dead'
+    this.inCover = false;
+
+    // Weapons & Arsenal System
+    this.weapons = new WeaponManager(this);
+
+    // Aiming
+    this.aimAngle = 0; // angle in radians
+    this.aimMode = 'straight'; // 'up', 'straight', 'down', 'free'
+    this.isAiming = false;
+    this.laserSightGraphics = scene.add.graphics().setDepth(149);
 
     // Grabbing / Carrying
     this.grabbedGuard = null;
@@ -50,21 +56,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Thermal Visor
     this.thermalActive = false;
-    this.thermalTimer = 0; // 6s duration
-    this.thermalCooldown = 0; // 10s cooldown
+    this.thermalTimer = 0;
+    this.thermalCooldown = 0;
 
-    // Interactive target within proximity
+    // Interactive target
     this.currentInteractive = null;
-
-    // Shooting
-    this.aimAngle = 0; // -1: up, 0: straight, 1: down
-    this.isAiming = false;
 
     // Zipline state
     this.currentZipline = null;
     this.ziplineProgress = 0;
-
-    // Vent state
     this.inVent = false;
 
     this.createAnimations();
@@ -76,125 +76,148 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     anims.create({
       key: 'ghost_idle',
-      frames: anims.generateFrameNumbers('ghost', { start: 0, end: 3 }),
-      frameRate: 4,
+      frames: anims.generateFrameNumbers('ghost', { start: 0, end: 7 }),
+      frameRate: 6,
       repeat: -1
     });
 
     anims.create({
       key: 'ghost_walk',
-      frames: anims.generateFrameNumbers('ghost', { start: 4, end: 9 }),
+      frames: anims.generateFrameNumbers('ghost', { start: 8, end: 15 }),
       frameRate: 8,
       repeat: -1
     });
 
     anims.create({
       key: 'ghost_sneak',
-      frames: anims.generateFrameNumbers('ghost', { start: 10, end: 13 }),
-      frameRate: 6,
+      frames: anims.generateFrameNumbers('ghost', { start: 16, end: 23 }),
+      frameRate: 7,
       repeat: -1
     });
 
     anims.create({
       key: 'ghost_run',
-      frames: anims.generateFrameNumbers('ghost', { start: 14, end: 19 }),
+      frames: anims.generateFrameNumbers('ghost', { start: 24, end: 31 }),
       frameRate: 11,
       repeat: -1
     });
 
     anims.create({
       key: 'ghost_jump',
-      frames: [{ key: 'ghost', frame: 20 }],
+      frames: [{ key: 'ghost', frame: 32 }],
       frameRate: 1
     });
 
     anims.create({
       key: 'ghost_fall',
-      frames: [{ key: 'ghost', frame: 22 }],
+      frames: [{ key: 'ghost', frame: 36 }],
       frameRate: 1
     });
 
     anims.create({
       key: 'ghost_ledge',
-      frames: anims.generateFrameNumbers('ghost', { start: 24, end: 25 }),
-      frameRate: 4,
+      frames: anims.generateFrameNumbers('ghost', { start: 40, end: 43 }),
+      frameRate: 5,
       repeat: -1
     });
 
     anims.create({
       key: 'ghost_pipe',
-      frames: anims.generateFrameNumbers('ghost', { start: 30, end: 33 }),
-      frameRate: 6,
+      frames: anims.generateFrameNumbers('ghost', { start: 48, end: 55 }),
+      frameRate: 7,
       repeat: -1
     });
 
     anims.create({
-      key: 'ghost_rope',
-      frames: anims.generateFrameNumbers('ghost', { start: 34, end: 36 }),
+      key: 'ghost_aim_straight',
+      frames: [{ key: 'ghost', frame: 56 }],
+      frameRate: 1
+    });
+
+    anims.create({
+      key: 'ghost_aim_up',
+      frames: [{ key: 'ghost', frame: 59 }],
+      frameRate: 1
+    });
+
+    anims.create({
+      key: 'ghost_aim_down',
+      frames: [{ key: 'ghost', frame: 61 }],
+      frameRate: 1
+    });
+
+    anims.create({
+      key: 'ghost_cover',
+      frames: [{ key: 'ghost', frame: 63 }],
+      frameRate: 1
+    });
+
+    anims.create({
+      key: 'ghost_wall',
+      frames: [{ key: 'ghost', frame: 64 }],
+      frameRate: 1
+    });
+
+    anims.create({
+      key: 'ghost_knockout',
+      frames: anims.generateFrameNumbers('ghost', { start: 72, end: 75 }),
+      frameRate: 10,
+      repeat: 0
+    });
+
+    anims.create({
+      key: 'ghost_vent',
+      frames: anims.generateFrameNumbers('ghost', { start: 80, end: 87 }),
       frameRate: 6,
       repeat: -1
     });
 
     anims.create({
       key: 'ghost_ladder',
-      frames: anims.generateFrameNumbers('ghost', { start: 37, end: 40 }),
+      frames: anims.generateFrameNumbers('ghost', { start: 88, end: 95 }),
       frameRate: 7,
       repeat: -1
     });
 
     anims.create({
-      key: 'ghost_wall',
-      frames: [{ key: 'ghost', frame: 41 }],
-      frameRate: 1
-    });
-
-    anims.create({
-      key: 'ghost_shoot',
-      frames: anims.generateFrameNumbers('ghost', { start: 43, end: 45 }),
-      frameRate: 10,
-      repeat: 0
-    });
-
-    anims.create({
-      key: 'ghost_knockout',
-      frames: anims.generateFrameNumbers('ghost', { start: 46, end: 49 }),
-      frameRate: 10,
-      repeat: 0
-    });
-
-    anims.create({
       key: 'ghost_zipline',
-      frames: anims.generateFrameNumbers('ghost', { start: 56, end: 57 }),
+      frames: anims.generateFrameNumbers('ghost', { start: 96, end: 99 }),
       frameRate: 6,
       repeat: -1
     });
 
     anims.create({
-      key: 'ghost_vent',
-      frames: anims.generateFrameNumbers('ghost', { start: 58, end: 61 }),
-      frameRate: 5,
+      key: 'ghost_rope',
+      frames: anims.generateFrameNumbers('ghost', { start: 100, end: 103 }),
+      frameRate: 6,
       repeat: -1
     });
 
     anims.create({
       key: 'ghost_hurt',
-      frames: [{ key: 'ghost', frame: 62 }],
+      frames: [{ key: 'ghost', frame: 104 }],
       frameRate: 1
     });
 
     anims.create({
       key: 'ghost_dead',
-      frames: [{ key: 'ghost', frame: 63 }],
+      frames: [{ key: 'ghost', frame: 107 }],
       frameRate: 1
     });
   }
 
   update(time, delta, input) {
-    if (this.state === 'dead') return;
+    if (this.state === 'dead') {
+      this.laserSightGraphics.clear();
+      return;
+    }
 
     const dt = delta / 1000;
 
-    // Thermal Visor Management
+    // Update weapons and gadgets
+    this.weapons.update(dt, input);
+
+    // Update Thermal Visor
     this.updateThermal(dt, input);
 
     // Fall height tracker for damage (>6 tiles = 96px => 30 dmg)
@@ -207,9 +230,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       if (fallDistance > 96) {
         this.takeDamage(30, 'fall');
       }
-      // Landing noise ring
       if (fallDistance > 32) {
-        this.scene.stealth.emitNoise(this.x, this.y, 80);
+        this.scene.stealth?.emitNoise(this.x, this.y, 80);
       }
     }
 
@@ -226,7 +248,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.jumpBufferTimer = Math.max(0, this.jumpBufferTimer - dt);
     }
 
-    // State specific updates
+    // State machine updates
     switch (this.state) {
       case 'zipline':
         this.updateZipline(dt, input);
@@ -255,9 +277,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       case 'drag_body':
         this.updateDragBody(dt, input);
         break;
-      case 'shoot':
       case 'knockout':
-        // Locked during animation
+        break;
+      case 'cover':
+        this.updateCover(dt, input);
         break;
       case 'normal':
       case 'sneak':
@@ -266,19 +289,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         break;
     }
 
-    // Interactive object triggers (e.g. hack terminal, door peek, open vent, zipline start)
+    // Draw Laser Sight while aiming
+    this.updateLaserSight(input);
+
+    // Interactive checks
     this.checkInteractions(input);
   }
 
   // ==========================================
-  // NORMAL MOVEMENT & SNEAK
+  // NORMAL MOVEMENT, SNEAK & COVER SYSTEM
   // ==========================================
   updateGroundAndAir(dt, input) {
     const onGround = this.body.blocked.down;
 
-    // Check Wall-press trigger: press Down next to a wall in shadow
+    // Check Wall-press trigger in shadows
     if (onGround && input.down && (this.body.blocked.left || this.body.blocked.right)) {
-      if (this.scene.stealth.playerVisibility < 35) {
+      if (this.scene.stealth?.playerVisibility < 35) {
         this.state = 'wall_press';
         this.body.setVelocityX(0);
         this.play('ghost_wall', true);
@@ -286,13 +312,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    // Aiming / Shooting mode
+    // Check Cover trigger: crouch near crate or railing
+    if (onGround && input.down && this.checkNearCoverObject()) {
+      this.state = 'cover';
+      this.inCover = true;
+      this.body.setVelocityX(0);
+      this.play('ghost_cover', true);
+      return;
+    }
+
+    // Aiming mode
     if (input.shoot) {
       this.handleAiming(input);
       return;
     }
 
-    // Determine speed mode
+    // Movement speeds
     let targetSpeed = this.SPEED_WALK;
     let isSneaking = input.sneak;
     let isRunning = false;
@@ -301,7 +336,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       targetSpeed = this.SPEED_SNEAK;
       this.state = 'sneak';
     } else if ((input.left || input.right) && !isSneaking && !input.down) {
-      // Double tap or normal run
       targetSpeed = this.SPEED_RUN;
       isRunning = true;
       this.state = 'normal';
@@ -309,7 +343,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.state = 'normal';
     }
 
-    // Left / Right velocity
     if (input.left) {
       this.body.setVelocityX(-targetSpeed);
       this.setFlipX(true);
@@ -328,8 +361,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.footstepTimer = 0;
         audioSystem.playFootstep(isRunning);
         if (isRunning) {
-          // Running emits 80px noise ring!
-          this.scene.stealth.emitNoise(this.x, this.y, 80);
+          this.scene.stealth?.emitNoise(this.x, this.y, 80);
         }
       }
     }
@@ -342,7 +374,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.play('ghost_jump', true);
     }
 
-    // Animation selection
+    // Animation state
     if (onGround) {
       if (Math.abs(this.body.velocity.x) > 5) {
         if (isSneaking) {
@@ -354,7 +386,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         }
       } else {
         if (input.down) {
-          this.play('ghost_sneak', true); // crouch idle
+          this.play('ghost_sneak', true);
         } else {
           this.play('ghost_idle', true);
         }
@@ -367,79 +399,133 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    // Takedown / Knockout trigger [J]
+    // Takedown / Interact [J]
     if (input.actionJustPressed) {
       this.tryTakedown();
     }
 
-    // Grab Guard trigger [L]
+    // Grab Guard [L]
     if (input.grabJustPressed) {
       this.tryGrabGuard();
     }
 
-    // Check overhead pipe grab
+    // Overhead pipe grab check
     if (!onGround && input.up) {
       this.checkOverheadPipe();
     }
 
-    // Check ladder grab
+    // Ladder check
     if (input.up || input.down) {
       this.checkLadder();
     }
   }
 
-  // ==========================================
-  // AIMING & SILENCED PISTOL
-  // ==========================================
-  handleAiming(input) {
-    this.body.setVelocityX(0);
-    this.play('ghost_shoot', true);
-
-    // Aim angle
-    if (input.up) {
-      this.aimAngle = -0.5; // up angle
-    } else if (input.down) {
-      this.aimAngle = 0.5; // down angle
-    } else {
-      this.aimAngle = 0; // straight
-    }
-
-    if (input.shootJustPressed) {
-      this.fireSilencedPistol();
-    }
+  checkNearCoverObject() {
+    // Check if player is adjacent to a crate or railing
+    const bounds = this.getBounds();
+    return this.scene.collisionGroup.getChildren().some(b => {
+      const bBounds = b.getBounds();
+      return Math.abs(bBounds.centerY - bounds.centerY) < 24 &&
+             (Math.abs(bBounds.left - bounds.right) < 16 || Math.abs(bBounds.right - bounds.left) < 16);
+    });
   }
 
-  fireSilencedPistol() {
-    if (this.ammo <= 0) {
-      audioSystem.playRadioBlip(); // dry fire click
+  updateCover(dt, input) {
+    this.body.setVelocityX(0);
+
+    // Pop out to aim/shoot
+    if (input.shoot) {
+      this.handleAiming(input);
       return;
     }
 
-    this.ammo--;
-    audioSystem.playSuppressedShot();
+    // Exit cover on movement or jump
+    if (input.left || input.right || input.jumpJustPressed || !input.down) {
+      this.inCover = false;
+      this.state = 'normal';
+    }
+  }
+
+  // ==========================================
+  // AIMING & WEAPONS HANDLING
+  // ==========================================
+  handleAiming(input) {
+    this.body.setVelocityX(0);
+    this.isAiming = true;
+
+    const facing = this.flipX ? -1 : 1;
+
+    // Aim angles:
+    // Keyboard: Up = -35 deg, Down = +35 deg, default = 0 deg
+    let angleRad = 0;
+    if (input.up) {
+      this.aimMode = 'up';
+      this.play('ghost_aim_up', true);
+      angleRad = -0.6;
+    } else if (input.down) {
+      this.aimMode = 'down';
+      this.play('ghost_aim_down', true);
+      angleRad = 0.6;
+    } else {
+      this.aimMode = 'straight';
+      this.play('ghost_aim_straight', true);
+      angleRad = 0;
+    }
+
+    // Mouse aiming overrides on desktop
+    if (input.mouseActive && input.mouseWorldX !== undefined) {
+      const dx = input.mouseWorldX - this.x;
+      const dy = input.mouseWorldY - this.y;
+      angleRad = Math.atan2(dy, Math.abs(dx));
+      this.setFlipX(dx < 0);
+    }
+
+    // Final world angle
+    this.aimAngle = facing === -1 ? (Math.PI - angleRad) : angleRad;
+
+    // Fire weapon
+    const isAuto = this.weapons.getCurrentConfig().auto;
+    if (isAuto ? input.shoot : input.shootJustPressed) {
+      const originX = this.x + facing * 12;
+      const originY = this.y - 2;
+      this.weapons.fire(this.aimAngle, originX, originY);
+    }
+  }
+
+  updateLaserSight(input) {
+    this.laserSightGraphics.clear();
+
+    if (!input.shoot || this.state === 'dead') {
+      this.isAiming = false;
+      return;
+    }
 
     const facing = this.flipX ? -1 : 1;
     const startX = this.x + facing * 12;
     const startY = this.y - 2;
+    const sightRange = 160;
 
-    const angle = this.aimAngle;
-    const targetX = startX + facing * 320;
-    const targetY = startY + angle * 160;
+    const endX = startX + Math.cos(this.aimAngle) * sightRange;
+    const endY = startY + Math.sin(this.aimAngle) * sightRange;
 
-    // Bullet Raycast check
-    this.scene.handleBulletHit(startX, startY, targetX, targetY);
+    // Tactical green laser sight
+    this.laserSightGraphics.lineStyle(1.0, 0x22c55e, 0.7);
+    this.laserSightGraphics.lineBetween(startX, startY, endX, endY);
+
+    // Laser dot at end
+    this.laserSightGraphics.fillStyle(0x86efac, 0.9);
+    this.laserSightGraphics.fillCircle(endX, endY, 1.5);
   }
 
   // ==========================================
-  // TAKEDOWN & GUARD INTERACTION
+  // TAKEDOWN & INTERACTION
   // ==========================================
   tryTakedown() {
     if (!this.scene.guards) return;
     const unawareGuard = this.scene.guards.getChildren().find(g => {
       if (g.isKnockedOut || g.isDead) return false;
       const dist = Phaser.Math.Distance.Between(this.x, this.y, g.x, g.y);
-      // Unaware guard within 22 px
-      return dist <= 22 && !g.isAlert;
+      return dist <= 24 && !g.isAlert;
     });
 
     if (unawareGuard) {
@@ -461,7 +547,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.scene.guards) return;
 
     if (this.grabbedGuard) {
-      // Release or knockout grabbed guard
       this.grabbedGuard.knockout();
       this.grabbedGuard = null;
       this.state = 'normal';
@@ -471,7 +556,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const unawareGuard = this.scene.guards.getChildren().find(g => {
       if (g.isKnockedOut || g.isDead) return false;
       const dist = Phaser.Math.Distance.Between(this.x, this.y, g.x, g.y);
-      return dist <= 24 && !g.isAlert;
+      return dist <= 26 && !g.isAlert;
     });
 
     if (unawareGuard) {
@@ -482,7 +567,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   updateGrabGuard(dt, input) {
-    // Ghost holds guard hostage (useful for hand scanners)
     const moveSpeed = 35;
     if (input.left) {
       this.body.setVelocityX(-moveSpeed);
@@ -499,7 +583,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.grabbedGuard.y = this.y;
     }
 
-    // Knock out on J or release on L
     if (input.actionJustPressed || input.grabJustPressed) {
       if (this.grabbedGuard) {
         this.grabbedGuard.knockout();
@@ -534,7 +617,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   // ==========================================
-  // LEDGE GRAB & CLIMB
+  // LEDGE, PIPE & LADDER
   // ==========================================
   grabLedge(ledgeX, ledgeY, facingLeft) {
     if (this.state === 'ledge_grab' || this.state === 'ledge_climb') return;
@@ -549,10 +632,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   updateLedgeGrab(dt, input) {
-    // Up to climb up, Down to drop
     if (input.up) {
       this.state = 'ledge_climb';
-      this.play('ghost_ledge', false);
       this.scene.tweens.add({
         targets: this,
         y: this.y - 20,
@@ -569,23 +650,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  // ==========================================
-  // OVERHEAD PIPE HANG & HAND-OVER-HAND
-  // ==========================================
   checkOverheadPipe() {
     if (!this.scene.pipeTiles) return;
-    const tile = this.scene.pipeTiles.getTileAtWorldXY(this.x, this.y - 18);
+    const tile = this.scene.pipeTiles.getTileAtWorldXY(this.x, this.y - 22);
     if (tile && tile.index === 5) {
       this.state = 'pipe_hang';
       this.body.setAllowGravity(false);
       this.body.setVelocity(0, 0);
-      this.y = tile.pixelY + 24;
+      this.y = tile.pixelY + 28;
       this.play('ghost_pipe', true);
     }
   }
 
   updatePipeHang(dt, input) {
-    // Move hand over hand: 40 px/s
     if (input.left) {
       this.body.setVelocityX(-this.SPEED_PIPE);
       this.play('ghost_pipe', true);
@@ -595,21 +672,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.body.setVelocityX(0);
       this.stop();
-      this.setFrame(30);
+      this.setFrame(48);
     }
 
-    // Check if still under pipe
-    const tile = this.scene.pipeTiles.getTileAtWorldXY(this.x, this.y - 24);
+    const tile = this.scene.pipeTiles.getTileAtWorldXY(this.x, this.y - 28);
     if (!tile || tile.index !== 5 || input.down) {
-      // Drop
       this.body.setAllowGravity(true);
       this.state = 'normal';
     }
   }
 
-  // ==========================================
-  // LADDER & ROPE SLIDE
-  // ==========================================
   checkLadder() {
     if (!this.scene.ladderTiles) return;
     const tile = this.scene.ladderTiles.getTileAtWorldXY(this.x, this.y);
@@ -623,7 +695,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   updateLadder(dt, input) {
-    const climbSpeed = 50;
+    const climbSpeed = 55;
     if (input.up) {
       this.body.setVelocityY(-climbSpeed);
       this.play('ghost_ladder', true);
@@ -660,9 +732,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   updateRopeSlide(dt, input) {
-    let speed = 60;
+    let speed = 65;
     if (input.up) speed = 25; // brake
-    if (input.down) speed = 100; // fast slide
+    if (input.down) speed = 110; // fast slide
 
     this.y += speed * dt;
 
@@ -672,19 +744,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  // ==========================================
-  // WALL PRESS
-  // ==========================================
   updateWallPress(dt, input) {
     this.body.setVelocityX(0);
-    // Exit wall press if moving away or jumping
     if (input.left || input.right || input.jumpJustPressed || !input.down) {
       this.state = 'normal';
     }
   }
 
   // ==========================================
-  // EXTRA MECHANIC 1: ZIP LINE (Section A)
+  // ZIPLINE & VENT SHORTCUT
   // ==========================================
   startZipLine(zipline) {
     this.state = 'zipline';
@@ -702,8 +770,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
-    // Slide down cable from start to end; hold Up to brake
-    const speed = input.up ? 0.35 : 0.85; // progress per second
+    const speed = input.up ? 0.35 : 0.85;
     this.ziplineProgress += speed * dt;
 
     const currentX = Phaser.Math.Linear(this.currentZipline.startX, this.currentZipline.endX, this.ziplineProgress);
@@ -712,8 +779,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.x = currentX;
     this.y = currentY;
 
-    // Guards below only notice if he passes through a light
-    if (this.scene.stealth.playerVisibility > 50) {
+    if (this.scene.stealth?.playerVisibility > 50) {
       this.scene.guards.getChildren().forEach(g => {
         if (!g.isKnockedOut && Math.abs(g.x - this.x) < 80) {
           g.setSuspiciousState(this.x, this.y);
@@ -729,21 +795,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  // ==========================================
-  // EXTRA MECHANIC 2: VENT CRAWL (Section C)
-  // ==========================================
   enterVent(ventX, ventY) {
     this.state = 'vent_crawl';
     this.inVent = true;
     this.x = ventX;
     this.y = ventY;
-    this.body.setSize(16, 12);
-    this.body.setOffset(4, 20);
+    this.body.setSize(18, 14);
+    this.body.setOffset(5, 24);
     this.play('ghost_vent', true);
   }
 
   updateVentCrawl(dt, input) {
-    const ventSpeed = 28; // slow & silent
+    const ventSpeed = 28;
     if (input.left) {
       this.body.setVelocityX(-ventSpeed);
       this.setFlipX(true);
@@ -757,7 +820,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.stop();
     }
 
-    // Silent footsteps
     if (input.left || input.right) {
       this.footstepTimer += dt;
       if (this.footstepTimer >= 0.45) {
@@ -766,7 +828,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    // Check exit vent
     if (input.actionJustPressed && this.currentInteractive && this.currentInteractive.type === 'vent_exit') {
       this.exitVent(this.currentInteractive.exitX, this.currentInteractive.exitY);
     }
@@ -777,13 +838,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.inVent = false;
     this.x = exitX;
     this.y = exitY;
-    this.body.setSize(10, 28);
-    this.body.setOffset(7, 4);
+    this.body.setSize(12, 32);
+    this.body.setOffset(8, 8);
     this.play('ghost_idle', true);
   }
 
   // ==========================================
-  // EXTRA MECHANIC 3: THERMAL VISOR
+  // THERMAL VISOR
   // ==========================================
   updateThermal(dt, input) {
     if (this.thermalCooldown > 0) {
@@ -805,8 +866,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   toggleThermal(enable) {
     this.thermalActive = enable;
     if (enable) {
-      this.thermalTimer = 6.0; // 6 seconds duration
-      this.thermalCooldown = 10.0; // 10 seconds cooldown
+      this.thermalTimer = 6.0;
+      this.thermalCooldown = 10.0;
       audioSystem.playThermalToggle(true);
     } else {
       audioSystem.playThermalToggle(false);
@@ -815,45 +876,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   // ==========================================
-  // INTERACTIONS CHECK (Peek, Hack, Terminal, Doors, Items)
-  // ==========================================
-  checkInteractions(input) {
-    if (!this.currentInteractive) return;
-
-    const ci = this.currentInteractive;
-
-    // Door Peek: at closed doors press Up to peek through gap
-    if (ci.type === 'door' && !ci.isOpen) {
-      if (input.up) {
-        this.scene.openDoorPeek(ci);
-      } else if (input.actionJustPressed) {
-        // Try opening with keycard or captive guard
-        ci.tryOpen(this);
-      }
-    }
-
-    // Security Terminal: opens 10s pattern puzzle
-    if (ci.type === 'terminal' && !ci.isHacked) {
-      if (input.actionJustPressed) {
-        this.scene.openHackMinigame(ci);
-      }
-    }
-
-    // Data Drive / Intel pickup
-    if (ci.type === 'item') {
-      if (input.actionJustPressed || Phaser.Math.Distance.Between(this.x, this.y, ci.x, ci.y) < 16) {
-        ci.collect(this);
-      }
-    }
-  }
-
-  // ==========================================
-  // DAMAGE & HEALTH
+  // DAMAGE & HEALTH (WITH COVER REDUCTION)
   // ==========================================
   takeDamage(amount, source = 'bullet') {
     if (this.state === 'dead') return;
 
-    this.hp = Math.max(0, this.hp - amount);
+    let finalDmg = amount;
+    // Cover system: 60% damage reduction while in cover or wall-press
+    if (this.inCover || this.state === 'wall_press') {
+      finalDmg = Math.round(amount * 0.4);
+    }
+
+    this.hp = Math.max(0, this.hp - finalDmg);
 
     this.setTint(0xff3333);
     this.scene.time.delayedCall(120, () => this.clearTint());
@@ -874,5 +908,56 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.time.delayedCall(1200, () => {
       this.scene.triggerMissionFailed(`Agent killed in action (${cause}).`);
     });
+  }
+
+  // Check interactions
+  checkInteractions(input) {
+    if (!this.currentInteractive) return;
+    const ci = this.currentInteractive;
+
+    if (ci.type === 'door' && !ci.isOpen) {
+      if (input.up) {
+        this.scene.openDoorPeek(ci);
+      } else if (input.actionJustPressed) {
+        ci.tryOpen(this);
+      }
+    }
+
+    if (ci.type === 'terminal' && !ci.isHacked) {
+      if (input.actionJustPressed) {
+        this.scene.openHackMinigame(ci);
+      }
+    }
+
+    if (ci.type === 'item') {
+      if (input.actionJustPressed || Phaser.Math.Distance.Between(this.x, this.y, ci.x, ci.y) < 18) {
+        ci.collect(this);
+      }
+    }
+
+    // Scavenge ammo/weapons from knocked-out guards
+    if (input.actionJustPressed && this.scene.guards) {
+      const body = this.scene.guards.getChildren().find(g => {
+        return (g.isKnockedOut || g.isDead) && !g.looted &&
+               Phaser.Math.Distance.Between(this.x, this.y, g.x, g.y) < 28;
+      });
+
+      if (body) {
+        body.looted = true;
+        this.scavengeFromGuard(body);
+      }
+    }
+  }
+
+  scavengeFromGuard(guard) {
+    if (guard.guardType === 'heavy') {
+      this.weapons.unlockWeapon(WEAPON_TYPES.SHOTGUN);
+      this.weapons.ammo[WEAPON_TYPES.SHOTGUN].reserve = Math.min(20, this.weapons.ammo[WEAPON_TYPES.SHOTGUN].reserve + 5);
+      if (this.scene.hud) this.scene.hud.setObjective('SCAVENGED: SHOTGUN & 12GA SHELLS');
+    } else {
+      this.weapons.ammo[WEAPON_TYPES.PISTOL].reserve = Math.min(32, this.weapons.ammo[WEAPON_TYPES.PISTOL].reserve + 8);
+      if (this.scene.hud) this.scene.hud.setObjective('SCAVENGED: PISTOL 9MM AMMO');
+    }
+    audioSystem.playFootstep(true);
   }
 }

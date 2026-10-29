@@ -1,7 +1,7 @@
 /**
- * AssetGenerator.js
- * Generates all 100% original 2D pixel-art textures and animations for Silent Descent
- * adhering to the 32-color industrial spy palette.
+ * AssetGenerator.js — NO TRACE: LEVEL 1 "IRON TIDE"
+ * High-fidelity, 48-64 color master palette procedural pixel art generator.
+ * Creates rich, textured tiles, multi-frame 32-40px characters, weapons, props, and UI.
  */
 
 export class AssetGenerator {
@@ -12,12 +12,12 @@ export class AssetGenerator {
     this.createGuardSprites(scene);
     this.createTileset(scene);
     this.createEntitiesTextures(scene);
+    this.createWeaponsAndGadgetsTextures(scene);
     this.createHelicopterTexture(scene);
     this.createHUDTextures(scene);
     this.createThermalTextures(scene);
   }
 
-  // Helper to create an offscreen canvas
   static makeCanvas(w, h) {
     const canvas = document.createElement('canvas');
     canvas.width = w;
@@ -27,36 +27,15 @@ export class AssetGenerator {
     return { canvas, ctx };
   }
 
-  // ==========================================
-  // GHOST (VIKRAM RAO) SPRITESHEET (24x32 per frame)
-  // ==========================================
+  // =========================================================================
+  // GHOST (VIKRAM RAO) — ~36px Tall High-Detail Pixel Art (Frame: 28x40)
+  // =========================================================================
   static createGhostSprites(scene) {
     const tm = scene.textures;
-    // Total frames:
-    // Row 0 (0-3): Idle (4 frames)
-    // Row 1 (4-9): Walk (6 frames)
-    // Row 2 (10-13): Sneak (4 frames)
-    // Row 3 (14-19): Run (6 frames)
-    // Row 4 (20-21): Jump (2 frames)
-    // Row 5 (22-23): Fall (2 frames)
-    // Row 6 (24-25): Ledge grab & hang (2 frames)
-    // Row 7 (26-29): Ledge climb (4 frames)
-    // Row 8 (30-33): Pipe hang & move (4 frames)
-    // Row 9 (34-36): Rope slide (3 frames)
-    // Row 10 (37-40): Ladder climb (4 frames)
-    // Row 11 (41-42): Wall press (2 frames)
-    // Row 12 (43-45): Shoot (3 frames)
-    // Row 13 (46-49): Knockout takedown (4 frames)
-    // Row 14 (50-51): Grab guard (2 frames)
-    // Row 15 (52-55): Drag body (4 frames)
-    // Row 16 (56-57): Zip line (2 frames)
-    // Row 17 (58-61): Vent crawl (4 frames)
-    // Row 18 (62-63): Hurt / Dead (2 frames)
-
-    const frameW = 24;
-    const frameH = 32;
-    const cols = 6;
-    const rows = 19;
+    const frameW = 28;
+    const frameH = 40;
+    const cols = 8;
+    const rows = 14;
     const { canvas, ctx } = this.makeCanvas(cols * frameW, rows * frameH);
 
     const drawFrame = (col, row, drawFn) => {
@@ -66,280 +45,306 @@ export class AssetGenerator {
       ctx.restore();
     };
 
-    // Color definitions
-    const C = {
-      suitDark: '#161a23',
-      suitMid: '#242c3d',
-      suitLight: '#39465e',
-      boots: '#0c0f14',
-      gloves: '#0c0f14',
-      skin: '#c68660',
-      skinShadow: '#8f573c',
-      hair: '#111317',
-      amberVisor: '#f59e0b',
-      amberGlow: '#fbbf24',
-      ropePack: '#524336',
-      ropePackStrap: '#1e2430',
-      gunMetal: '#475569',
-      flashMuzzle: '#fde047'
+    // 48-64 Master Palette Shades
+    const PAL = {
+      outline: '#05070c',
+      suitDark: '#121721',
+      suitMid: '#1e2636',
+      suitLight: '#2f3d54',
+      suitHighlight: '#475b7a',
+      webbing: '#0a0d14',
+      webbingBuckle: '#64748b',
+      skinDark: '#78350f',
+      skinMid: '#b45309',
+      skinLight: '#d97706',
+      hair: '#090b0e',
+      amberVisorDark: '#b45309',
+      amberVisorMid: '#f59e0b',
+      amberVisorGlow: '#fef08a',
+      boots: '#090c10',
+      gloves: '#0a0d12',
+      ropeDark: '#3f2e1e',
+      ropeMid: '#634b35',
+      ropeLight: '#8a6b4f',
+      gunMetal: '#334155',
+      gunLight: '#64748b'
     };
 
-    // Base body drawing helper
-    const drawBaseGhost = (ctx, opt = {}) => {
+    const drawGhostBase = (ctx, opt = {}) => {
       const {
-        legOffset = 0,
         crouch = 0,
-        armPose = 'down', // 'down', 'aim', 'hang', 'climb', 'wall', 'vent'
-        visorGlow = true,
+        legOffset = 0,
+        armPose = 'down', // 'down', 'aim_straight', 'aim_up', 'aim_down', 'hang', 'climb', 'wall', 'vent', 'cover'
+        inCover = false,
         backToWall = false,
-        headTilt = 0,
-        carryingRope = true
+        visorGlow = true,
+        weaponType = 'pistol'
       } = opt;
 
       const yOff = crouch;
 
-      // Rope pack on back
-      if (carryingRope && !backToWall) {
-        ctx.fillStyle = C.ropePack;
-        ctx.fillRect(5, 11 + yOff, 4, 9);
-        ctx.fillStyle = C.ropePackStrap;
-        ctx.fillRect(8, 11 + yOff, 2, 9);
+      // Dark tactical contour outline behind torso & head
+      ctx.fillStyle = PAL.outline;
+      ctx.fillRect(9, 4 + yOff, 11, 23);
+
+      // Rope Pack on back
+      if (!backToWall && armPose !== 'vent') {
+        ctx.fillStyle = PAL.outline;
+        ctx.fillRect(4, 11 + yOff, 7, 13);
+        ctx.fillStyle = PAL.ropeDark;
+        ctx.fillRect(5, 12 + yOff, 5, 11);
+        ctx.fillStyle = PAL.ropeMid;
+        ctx.fillRect(6, 13 + yOff, 3, 9);
+        // Coiled rope highlights
+        ctx.fillStyle = PAL.ropeLight;
+        ctx.fillRect(6, 14 + yOff, 3, 2);
+        ctx.fillRect(6, 18 + yOff, 3, 2);
       }
 
-      // Torso / Suit
-      ctx.fillStyle = C.suitDark;
-      ctx.fillRect(9, 10 + yOff, 7, 10);
-      ctx.fillStyle = C.suitMid;
-      ctx.fillRect(10, 11 + yOff, 5, 8);
-      ctx.fillStyle = C.suitLight;
-      ctx.fillRect(11, 12 + yOff, 3, 4); // Tactical chest rig
+      // Torso — Tactical stealth suit with Kevlar paneling
+      ctx.fillStyle = PAL.suitDark;
+      ctx.fillRect(10, 12 + yOff, 9, 13);
+      ctx.fillStyle = PAL.suitMid;
+      ctx.fillRect(11, 13 + yOff, 7, 11);
+      ctx.fillStyle = PAL.suitLight;
+      ctx.fillRect(12, 14 + yOff, 5, 6);
+      ctx.fillStyle = PAL.suitHighlight;
+      ctx.fillRect(13, 15 + yOff, 2, 3); // chest specular glint
 
-      // Head
-      ctx.fillStyle = C.skinShadow;
-      ctx.fillRect(10, 5 + yOff + headTilt, 5, 6);
-      ctx.fillStyle = C.skin;
-      ctx.fillRect(11, 6 + yOff + headTilt, 4, 4);
+      // Tactical Webbing Harness & Buckle
+      ctx.fillStyle = PAL.webbing;
+      ctx.fillRect(11, 17 + yOff, 7, 2); // belt
+      ctx.fillRect(14, 13 + yOff, 2, 7); // cross strap
+      ctx.fillStyle = PAL.webbingBuckle;
+      ctx.fillRect(14, 17 + yOff, 2, 2); // buckle
 
-      // Stubble & Hair
-      ctx.fillStyle = C.hair;
-      ctx.fillRect(10, 4 + yOff + headTilt, 6, 2); // hair top
-      ctx.fillRect(9, 5 + yOff + headTilt, 2, 3); // hair back
-      ctx.fillStyle = '#6b4632'; // stubble
-      ctx.fillRect(13, 8 + yOff + headTilt, 2, 2);
+      // Pistol Holster on hip
+      ctx.fillStyle = PAL.gunMetal;
+      ctx.fillRect(9, 21 + yOff, 2, 4);
 
-      // Single amber monocular visor (right eye)
-      if (backToWall) {
-        ctx.fillStyle = C.amberGlow;
-        ctx.fillRect(13, 6 + yOff + headTilt, 2, 2);
-      } else {
-        ctx.fillStyle = C.amberVisor;
-        ctx.fillRect(14, 6 + yOff + headTilt, 2, 2);
-        if (visorGlow) {
-          ctx.fillStyle = C.amberGlow;
-          ctx.fillRect(15, 6 + yOff + headTilt, 1, 2);
-        }
+      // Head & Face
+      ctx.fillStyle = PAL.skinDark;
+      ctx.fillRect(11, 5 + yOff, 7, 7);
+      ctx.fillStyle = PAL.skinMid;
+      ctx.fillRect(12, 6 + yOff, 6, 6);
+      ctx.fillStyle = PAL.skinLight;
+      ctx.fillRect(13, 7 + yOff, 4, 4);
+
+      // Short Hair & Stubble
+      ctx.fillStyle = PAL.hair;
+      ctx.fillRect(11, 4 + yOff, 8, 3); // hair top
+      ctx.fillRect(10, 5 + yOff, 2, 5); // hair back
+      ctx.fillStyle = PAL.skinDark;
+      ctx.fillRect(14, 10 + yOff, 3, 2); // 5 o'clock stubble
+
+      // Single Glowing Amber Monocular Visor (Right Eye)
+      ctx.fillStyle = PAL.amberVisorDark;
+      ctx.fillRect(15, 7 + yOff, 3, 3);
+      ctx.fillStyle = PAL.amberVisorMid;
+      ctx.fillRect(16, 7 + yOff, 2, 2);
+      if (visorGlow) {
+        ctx.fillStyle = PAL.amberVisorGlow;
+        ctx.fillRect(17, 8 + yOff, 1, 1); // bright center LED
       }
 
-      // Legs / Boots
+      // Legs & Footwear
       if (armPose === 'vent') {
-        // Vent crawling: horizontal
-        ctx.fillStyle = C.suitDark;
-        ctx.fillRect(3, 22, 16, 5);
-        ctx.fillStyle = C.boots;
-        ctx.fillRect(1, 23, 3, 4);
+        // Horizontal crawl
+        ctx.fillStyle = PAL.suitDark;
+        ctx.fillRect(4, 26, 20, 7);
+        ctx.fillStyle = PAL.boots;
+        ctx.fillRect(1, 27, 4, 5);
         return;
       }
 
       if (armPose === 'hang') {
-        // Hanging legs dangling
-        ctx.fillStyle = C.suitDark;
-        ctx.fillRect(10, 20 + yOff, 3, 8);
-        ctx.fillRect(12, 20 + yOff, 3, 7);
-        ctx.fillStyle = C.boots;
-        ctx.fillRect(10, 27 + yOff, 3, 3);
-        ctx.fillRect(12, 26 + yOff, 3, 3);
-        // Arms up
-        ctx.fillStyle = C.suitDark;
-        ctx.fillRect(10, 3, 3, 8);
-        ctx.fillStyle = C.gloves;
-        ctx.fillRect(10, 1, 3, 3);
+        // Hanging from pipe
+        ctx.fillStyle = PAL.suitDark;
+        ctx.fillRect(11, 25, 4, 9);
+        ctx.fillRect(14, 24, 4, 9);
+        ctx.fillStyle = PAL.boots;
+        ctx.fillRect(11, 33, 4, 5);
+        ctx.fillRect(14, 32, 4, 5);
+        // Arms straight up gripping overhead
+        ctx.fillStyle = PAL.suitMid;
+        ctx.fillRect(11, 1, 3, 11);
+        ctx.fillRect(15, 1, 3, 11);
+        ctx.fillStyle = PAL.gloves;
+        ctx.fillRect(10, 0, 4, 3);
+        ctx.fillRect(15, 0, 4, 3);
         return;
       }
 
-      // Standard legs
-      const leg1 = Math.sin(legOffset) * 3;
+      if (inCover) {
+        // Kneeling low in cover behind barricade
+        ctx.fillStyle = PAL.suitDark;
+        ctx.fillRect(9, 23, 10, 8);
+        ctx.fillStyle = PAL.boots;
+        ctx.fillRect(8, 29, 6, 4);
+        return;
+      }
+
+      // Articulated walking / running legs
+      const leg1 = Math.sin(legOffset) * 4;
       const leg2 = -leg1;
 
-      ctx.fillStyle = C.suitDark;
-      ctx.fillRect(9 + leg1, 19 + yOff, 3, 7 - crouch * 0.4);
-      ctx.fillRect(13 + leg2, 19 + yOff, 3, 7 - crouch * 0.4);
+      ctx.fillStyle = PAL.suitDark;
+      ctx.fillRect(10 + leg1, 24 + yOff, 4, 9 - crouch * 0.4);
+      ctx.fillRect(15 + leg2, 24 + yOff, 4, 9 - crouch * 0.4);
+      ctx.fillStyle = PAL.suitMid;
+      ctx.fillRect(11 + leg1, 25 + yOff, 2, 5);
+      ctx.fillRect(16 + leg2, 25 + yOff, 2, 5);
 
-      // Boots
-      ctx.fillStyle = C.boots;
-      ctx.fillRect(9 + leg1, 26 + yOff - (crouch > 4 ? 2 : 0), 4, 4);
-      ctx.fillRect(13 + leg2, 26 + yOff - (crouch > 4 ? 2 : 0), 4, 4);
+      // Heavy combat boots with grip tread
+      ctx.fillStyle = PAL.boots;
+      ctx.fillRect(10 + leg1, 32 + yOff - (crouch > 4 ? 2 : 0), 5, 5);
+      ctx.fillRect(15 + leg2, 32 + yOff - (crouch > 4 ? 2 : 0), 5, 5);
 
-      // Arms based on pose
-      if (armPose === 'aim') {
-        ctx.fillStyle = C.suitMid;
-        ctx.fillRect(13, 11 + yOff, 6, 3);
-        ctx.fillStyle = C.gloves;
-        ctx.fillRect(18, 11 + yOff, 3, 3);
-        // Silenced pistol
-        ctx.fillStyle = C.gunMetal;
-        ctx.fillRect(19, 10 + yOff, 5, 2); // suppressor
-        ctx.fillRect(19, 12 + yOff, 2, 2); // grip
+      // Arms & Weapon based on pose
+      if (armPose === 'aim_straight') {
+        ctx.fillStyle = PAL.suitMid;
+        ctx.fillRect(15, 13 + yOff, 8, 3);
+        ctx.fillStyle = PAL.gloves;
+        ctx.fillRect(21, 13 + yOff, 3, 3);
+        // Weapon
+        ctx.fillStyle = PAL.gunMetal;
+        ctx.fillRect(22, 12 + yOff, 6, 3);
+        ctx.fillStyle = PAL.gunLight;
+        ctx.fillRect(24, 13 + yOff, 4, 1); // barrel highlight
+      } else if (armPose === 'aim_up') {
+        ctx.fillStyle = PAL.suitMid;
+        ctx.fillRect(14, 11 + yOff, 6, 3);
+        ctx.fillStyle = PAL.gloves;
+        ctx.fillRect(18, 8 + yOff, 3, 3);
+        ctx.fillStyle = PAL.gunMetal;
+        ctx.fillRect(19, 5 + yOff, 5, 4);
+      } else if (armPose === 'aim_down') {
+        ctx.fillStyle = PAL.suitMid;
+        ctx.fillRect(14, 15 + yOff, 6, 3);
+        ctx.fillStyle = PAL.gloves;
+        ctx.fillRect(18, 17 + yOff, 3, 3);
+        ctx.fillStyle = PAL.gunMetal;
+        ctx.fillRect(19, 19 + yOff, 5, 4);
       } else if (armPose === 'wall') {
-        ctx.fillStyle = C.suitDark;
-        ctx.fillRect(7, 12 + yOff, 3, 7);
-        ctx.fillRect(15, 12 + yOff, 3, 7);
+        ctx.fillStyle = PAL.suitDark;
+        ctx.fillRect(8, 14 + yOff, 3, 9);
+        ctx.fillRect(18, 14 + yOff, 3, 9);
       } else {
-        // Arm swinging/down
-        const armSwing = Math.sin(legOffset + Math.PI) * 2;
-        ctx.fillStyle = C.suitDark;
-        ctx.fillRect(11 + armSwing, 11 + yOff, 3, 8);
-        ctx.fillStyle = C.gloves;
-        ctx.fillRect(11 + armSwing, 18 + yOff, 3, 3);
+        const armSwing = Math.sin(legOffset + Math.PI) * 2.5;
+        ctx.fillStyle = PAL.suitMid;
+        ctx.fillRect(12 + armSwing, 14 + yOff, 3, 9);
+        ctx.fillStyle = PAL.gloves;
+        ctx.fillRect(12 + armSwing, 22 + yOff, 3, 3);
       }
     };
 
-    // Generate each frame
-    // 0: Idle (4 frames)
+    // Row 0: Idle (8 frames of breathing)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 0, (c) => drawGhostBase(c, { crouch: i === 3 || i === 4 ? 1 : 0 }));
+    }
+
+    // Row 1: Tactical Walk (8 frames)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 1, (c) => drawGhostBase(c, { legOffset: (i / 8) * Math.PI * 2 }));
+    }
+
+    // Row 2: Low Sneak Glide (8 frames)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 2, (c) => drawGhostBase(c, { crouch: 6, legOffset: (i / 8) * Math.PI * 2 }));
+    }
+
+    // Row 3: Sprint Run (8 frames)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 3, (c) => drawGhostBase(c, { legOffset: (i / 8) * Math.PI * 2, crouch: 1 }));
+    }
+
+    // Row 4: Jump (4 frames) & Fall (4 frames)
     for (let i = 0; i < 4; i++) {
-      drawFrame(i, 0, (c) => drawBaseGhost(c, { crouch: i === 2 ? 1 : 0 }));
+      drawFrame(i, 4, (c) => drawGhostBase(c, { crouch: -2 - i, legOffset: 1 }));
+      drawFrame(i + 4, 4, (c) => drawGhostBase(c, { crouch: i, legOffset: 0.8 }));
     }
 
-    // 1: Walk (6 frames)
-    for (let i = 0; i < 6; i++) {
-      drawFrame(i, 1, (c) => drawBaseGhost(c, { legOffset: (i / 6) * Math.PI * 2 }));
-    }
-
-    // 2: Sneak (4 frames)
+    // Row 5: Ledge Grab (4) & Climb (4)
     for (let i = 0; i < 4; i++) {
-      drawFrame(i, 2, (c) => drawBaseGhost(c, { crouch: 5, legOffset: (i / 4) * Math.PI * 2 }));
+      drawFrame(i, 5, (c) => drawGhostBase(c, { armPose: 'hang', crouch: 2 + i * 0.5 }));
+      drawFrame(i + 4, 5, (c) => drawGhostBase(c, { crouch: -i * 6, armPose: 'climb' }));
     }
 
-    // 3: Run (6 frames)
-    for (let i = 0; i < 6; i++) {
-      drawFrame(i, 3, (c) => drawBaseGhost(c, { legOffset: (i / 6) * Math.PI * 2, crouch: 1, headTilt: 1 }));
+    // Row 6: Pipe Hang & Shimmy (8 frames)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 6, (c) => drawGhostBase(c, { armPose: 'hang', legOffset: (i / 8) * Math.PI * 2 }));
     }
 
-    // 4: Jump (2 frames)
-    drawFrame(0, 4, (c) => drawBaseGhost(c, { crouch: -2, legOffset: 1 }));
-    drawFrame(1, 4, (c) => drawBaseGhost(c, { crouch: -3, legOffset: 1.5 }));
+    // Row 7: Aiming (Straight 0-2, Up 3-4, Down 5-6, Cover 7)
+    drawFrame(0, 7, (c) => drawGhostBase(c, { armPose: 'aim_straight' }));
+    drawFrame(1, 7, (c) => drawGhostBase(c, { armPose: 'aim_straight' }));
+    drawFrame(2, 7, (c) => drawGhostBase(c, { armPose: 'aim_straight' }));
+    drawFrame(3, 7, (c) => drawGhostBase(c, { armPose: 'aim_up' }));
+    drawFrame(4, 7, (c) => drawGhostBase(c, { armPose: 'aim_up' }));
+    drawFrame(5, 7, (c) => drawGhostBase(c, { armPose: 'aim_down' }));
+    drawFrame(6, 7, (c) => drawGhostBase(c, { armPose: 'aim_down' }));
+    drawFrame(7, 7, (c) => drawGhostBase(c, { inCover: true, crouch: 6 }));
 
-    // 5: Fall (2 frames)
-    drawFrame(0, 5, (c) => drawBaseGhost(c, { crouch: 0, legOffset: 0.5 }));
-    drawFrame(1, 5, (c) => drawBaseGhost(c, { crouch: 1, legOffset: 0.8 }));
-
-    // 6: Ledge grab & hang (2 frames)
-    drawFrame(0, 6, (c) => drawBaseGhost(c, { armPose: 'hang', crouch: 2 }));
-    drawFrame(1, 6, (c) => drawBaseGhost(c, { armPose: 'hang', crouch: 3 }));
-
-    // 7: Ledge climb (4 frames)
+    // Row 8: Wall Press (4) & Reload (4)
     for (let i = 0; i < 4; i++) {
-      drawFrame(i, 7, (c) => drawBaseGhost(c, { crouch: -i * 3, armPose: 'climb' }));
+      drawFrame(i, 8, (c) => drawGhostBase(c, { backToWall: true, armPose: 'wall' }));
+      drawFrame(i + 4, 8, (c) => {
+        drawGhostBase(c, { crouch: 2 });
+        // magazine slap in
+        c.fillStyle = PAL.gunLight;
+        c.fillRect(16, 17 - i * 2, 2, 4);
+      });
     }
 
-    // 8: Pipe hang & move (4 frames)
+    // Row 9: Takedown Elbow Smash (4 frames) & Grab Guard (4 frames)
     for (let i = 0; i < 4; i++) {
-      drawFrame(i, 8, (c) => drawBaseGhost(c, { armPose: 'hang', legOffset: i }));
-    }
-
-    // 9: Rope slide (3 frames)
-    for (let i = 0; i < 3; i++) {
       drawFrame(i, 9, (c) => {
-        drawBaseGhost(c, { crouch: 1 });
-        c.fillStyle = '#8b5cf6'; // rope guide
-        c.fillRect(11, 0, 2, 32);
+        drawGhostBase(c, { crouch: 2 });
+        c.fillStyle = PAL.suitHighlight;
+        c.fillRect(16 + i * 2, 12, 5, 4); // elbow strike
+      });
+      drawFrame(i + 4, 9, (c) => drawGhostBase(c, { armPose: 'aim_straight', crouch: 2 }));
+    }
+
+    // Row 10: Vent Crawl (8 frames)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 10, (c) => drawGhostBase(c, { armPose: 'vent', legOffset: i }));
+    }
+
+    // Row 11: Ladder Climb (8 frames)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 11, (c) => drawGhostBase(c, { backToWall: true, legOffset: (i / 8) * Math.PI * 2 }));
+    }
+
+    // Row 12: Zip Line (4) & Rope Slide (4)
+    for (let i = 0; i < 4; i++) {
+      drawFrame(i, 12, (c) => {
+        drawGhostBase(c, { armPose: 'hang', crouch: 2 });
+        c.fillStyle = '#94a3b8';
+        c.fillRect(12, 0, 8, 3); // pulley
+      });
+      drawFrame(i + 4, 12, (c) => {
+        drawGhostBase(c, { crouch: 2 });
+        c.fillStyle = PAL.ropeLight;
+        c.fillRect(13, 0, 2, 40); // cord
       });
     }
 
-    // 10: Ladder climb (4 frames)
-    for (let i = 0; i < 4; i++) {
-      drawFrame(i, 10, (c) => drawBaseGhost(c, { backToWall: true, legOffset: i * 1.5 }));
+    // Row 13: Hurt (0-2) & Dead (3-7)
+    for (let i = 0; i < 3; i++) {
+      drawFrame(i, 13, (c) => drawGhostBase(c, { crouch: 3, visorGlow: false }));
     }
-
-    // 11: Wall press (2 frames)
-    drawFrame(0, 11, (c) => drawBaseGhost(c, { backToWall: true, armPose: 'wall' }));
-    drawFrame(1, 11, (c) => drawBaseGhost(c, { backToWall: true, armPose: 'wall', crouch: 1 }));
-
-    // 12: Shoot (3 frames)
-    drawFrame(0, 12, (c) => drawBaseGhost(c, { armPose: 'aim' }));
-    drawFrame(1, 12, (c) => {
-      drawBaseGhost(c, { armPose: 'aim' });
-      // muzzle spark
-      c.fillStyle = C.flashMuzzle;
-      c.fillRect(23, 9, 1, 3);
-    });
-    drawFrame(2, 12, (c) => drawBaseGhost(c, { armPose: 'aim' }));
-
-    // 13: Knockout takedown (4 frames)
-    for (let i = 0; i < 4; i++) {
+    for (let i = 3; i < 8; i++) {
       drawFrame(i, 13, (c) => {
-        drawBaseGhost(c, { crouch: i === 2 ? 2 : 1 });
-        // strike arm
-        c.fillStyle = C.suitLight;
-        c.fillRect(14 + i * 2, 10, 4, 3);
+        // fallen on back
+        c.fillStyle = PAL.suitDark;
+        c.fillRect(2, 34, 24, 6);
+        c.fillStyle = PAL.boots;
+        c.fillRect(0, 34, 4, 5);
+        c.fillStyle = PAL.skinMid;
+        c.fillRect(20, 31, 5, 5);
       });
     }
-
-    // 14: Grab guard (2 frames)
-    drawFrame(0, 14, (c) => drawBaseGhost(c, { armPose: 'aim', crouch: 1 }));
-    drawFrame(1, 14, (c) => drawBaseGhost(c, { armPose: 'aim', crouch: 2 }));
-
-    // 15: Drag body (4 frames)
-    for (let i = 0; i < 4; i++) {
-      drawFrame(i, 15, (c) => {
-        drawBaseGhost(c, { crouch: 3, legOffset: -i });
-        // dragged limbs
-        c.fillStyle = '#365314';
-        c.fillRect(3, 23, 7, 5);
-      });
-    }
-
-    // 16: Zip line (2 frames)
-    drawFrame(0, 16, (c) => {
-      drawBaseGhost(c, { armPose: 'hang', crouch: 1 });
-      c.fillStyle = '#cbd5e1'; // pulley handle
-      c.fillRect(8, 0, 8, 3);
-      c.fillStyle = '#94a3b8';
-      c.fillRect(11, 3, 2, 4);
-    });
-    drawFrame(1, 16, (c) => {
-      drawBaseGhost(c, { armPose: 'hang', crouch: 2 });
-      c.fillStyle = '#cbd5e1';
-      c.fillRect(8, 0, 8, 3);
-      c.fillStyle = '#94a3b8';
-      c.fillRect(11, 3, 2, 4);
-    });
-
-    // 17: Vent crawl (4 frames)
-    for (let i = 0; i < 4; i++) {
-      drawFrame(i, 17, (c) => {
-        // low profile horizontal crawl
-        c.fillStyle = C.suitDark;
-        c.fillRect(4 + (i % 2), 22, 15, 6);
-        c.fillStyle = C.skin;
-        c.fillRect(18 + (i % 2), 22, 4, 4);
-        c.fillStyle = C.amberGlow;
-        c.fillRect(20 + (i % 2), 23, 2, 2);
-      });
-    }
-
-    // 18: Hurt (0) & Death (1)
-    drawFrame(0, 18, (c) => drawBaseGhost(c, { crouch: 2, headTilt: -2, visorGlow: false }));
-    drawFrame(1, 18, (c) => {
-      // fallen flat on back
-      c.fillStyle = C.suitDark;
-      c.fillRect(2, 27, 20, 5);
-      c.fillStyle = C.boots;
-      c.fillRect(0, 27, 3, 4);
-      c.fillStyle = C.skin;
-      c.fillRect(18, 25, 4, 4);
-      c.fillStyle = C.amberVisor;
-      c.fillRect(19, 26, 2, 1);
-    });
 
     if (tm.exists('ghost')) tm.remove('ghost');
     scene.textures.addSpriteSheet('ghost', canvas, {
@@ -348,15 +353,15 @@ export class AssetGenerator {
     });
   }
 
-  // ==========================================
-  // GUARDS SPRITESHEET (Kestrel Yard & Office)
-  // ==========================================
+  // =========================================================================
+  // 3 ENEMY GUARD TYPES — Dock, Office, Heavy (Frame: 28x40)
+  // =========================================================================
   static createGuardSprites(scene) {
     const tm = scene.textures;
-    const frameW = 24;
-    const frameH = 32;
-    const cols = 6;
-    const rows = 8;
+    const frameW = 28;
+    const frameH = 40;
+    const cols = 8;
+    const rows = 9;
     const { canvas, ctx } = this.makeCanvas(cols * frameW, rows * frameH);
 
     const drawFrame = (col, row, drawFn) => {
@@ -366,113 +371,125 @@ export class AssetGenerator {
       ctx.restore();
     };
 
-    const drawGuard = (ctx, opt = {}) => {
+    const drawGuardBase = (ctx, opt = {}) => {
       const {
-        isOffice = false,
+        type = 'dock', // 'dock', 'office', 'heavy'
         legOffset = 0,
         alert = false,
+        aiming = false,
         knocked = false,
-        sleeping = false,
-        flashlight = true
+        sleeping = false
       } = opt;
 
       if (knocked) {
-        ctx.fillStyle = isOffice ? '#1e3a5f' : '#2d4512';
-        ctx.fillRect(2, 26, 19, 6);
+        ctx.fillStyle = type === 'heavy' ? '#1f2937' : (type === 'office' ? '#1e3a5f' : '#273812');
+        ctx.fillRect(2, 32, 23, 7);
         ctx.fillStyle = '#0f172a';
-        ctx.fillRect(0, 26, 3, 5);
+        ctx.fillRect(0, 32, 4, 6);
         ctx.fillStyle = '#d97706';
-        ctx.fillRect(17, 24, 4, 4);
+        ctx.fillRect(20, 29, 5, 5);
         return;
       }
 
-      if (sleeping) {
-        // Sitting slumped on chair/desk
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(8, 14, 8, 12);
-        ctx.fillStyle = '#1e3a5f';
-        ctx.fillRect(8, 12, 7, 7);
-        ctx.fillStyle = '#d97706';
-        ctx.fillRect(9, 8, 5, 4);
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(8, 6, 7, 3); // cap
-        return;
-      }
-
-      const leg1 = Math.sin(legOffset) * 2.5;
+      const leg1 = Math.sin(legOffset) * 3;
       const leg2 = -leg1;
 
       // Legs
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(9 + leg1, 20, 3, 7);
-      ctx.fillRect(13 + leg2, 20, 3, 7);
-      ctx.fillRect(8 + leg1, 27, 4, 4);
-      ctx.fillRect(12 + leg2, 27, 4, 4);
-
-      // Torso
-      if (isOffice) {
-        ctx.fillStyle = '#1e3a5f'; // Security guard navy shirt
-        ctx.fillRect(8, 10, 8, 10);
-        ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(9, 11, 2, 3); // badge
-      } else {
-        ctx.fillStyle = '#365314'; // Kestrel olive waterproof poncho
-        ctx.fillRect(7, 10, 10, 11);
-        ctx.fillStyle = '#4d7c0f';
-        ctx.fillRect(9, 11, 6, 8);
-      }
-
-      // Head
-      ctx.fillStyle = '#d97706';
-      ctx.fillRect(9, 5, 6, 5);
-
-      // Headwear (helmet or cap)
+      ctx.fillRect(10 + leg1, 24, 4, 10);
+      ctx.fillRect(15 + leg2, 24, 4, 10);
       ctx.fillStyle = '#1e293b';
-      if (isOffice) {
-        ctx.fillRect(8, 4, 8, 3);
-        ctx.fillRect(12, 6, 4, 1); // visor cap
+      ctx.fillRect(9 + leg1, 33, 5, 6);
+      ctx.fillRect(14 + leg2, 33, 5, 6);
+
+      // Torso based on Type
+      if (type === 'heavy') {
+        // Heavy Guard: Ballistic Vest, armor plating
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(7, 10, 14, 15);
+        ctx.fillStyle = '#374151';
+        ctx.fillRect(8, 11, 12, 13);
+        ctx.fillStyle = '#4b5563';
+        ctx.fillRect(9, 12, 10, 6); // ceramic chest plate
+      } else if (type === 'office') {
+        // Office Guard: Navy security shirt, tie, badge
+        ctx.fillStyle = '#1e3a5f';
+        ctx.fillRect(9, 11, 10, 14);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(13, 11, 2, 8); // black tie
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(11, 13, 2, 3); // gold security badge
       } else {
-        ctx.fillRect(8, 3, 8, 4); // tactical combat helmet
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(8, 7, 2, 2); // chinstrap
+        // Dock Guard: Olive waterproof poncho with hood
+        ctx.fillStyle = '#273910';
+        ctx.fillRect(7, 11, 14, 14);
+        ctx.fillStyle = '#3f5d1b';
+        ctx.fillRect(8, 12, 12, 12);
+        ctx.fillStyle = '#557c25';
+        ctx.fillRect(10, 13, 8, 8); // poncho front
       }
 
-      // Flashlight / Gun
-      if (alert) {
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(13, 11, 9, 3); // rifle pointed
+      // Head & Helmet
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(11, 6, 7, 6);
+
+      if (type === 'heavy') {
+        // Riot Helmet with dark face shield
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(9, 3, 11, 7);
         ctx.fillStyle = '#0f172a';
-        ctx.fillRect(17, 13, 2, 4);
-      } else if (flashlight) {
+        ctx.fillRect(14, 6, 6, 3); // tinted visor
+      } else if (type === 'office') {
+        // Security Visor Cap
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(9, 4, 10, 4);
+        ctx.fillRect(14, 6, 5, 2);
+      } else {
+        // Combat Helmet with strap
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(9, 3, 11, 5);
         ctx.fillStyle = '#475569';
-        ctx.fillRect(14, 13, 5, 3);
+        ctx.fillRect(9, 8, 2, 3); // chinstrap
+      }
+
+      // Weapons (SMG for Dock, Pistol for Office, Shotgun for Heavy)
+      if (alert || aiming) {
+        ctx.fillStyle = '#334155';
+        const wLen = type === 'heavy' ? 14 : (type === 'office' ? 7 : 11);
+        ctx.fillRect(16, 14, wLen, 4);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(16, 14, wLen, 2);
+      } else {
+        // Weapon / Flashlight lowered
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(16, 17, 7, 3);
         ctx.fillStyle = '#fef08a';
-        ctx.fillRect(18, 13, 2, 3); // lens
+        ctx.fillRect(21, 17, 2, 3); // flashlight lens
       }
     };
 
-    // Row 0: Kestrel Guard Idle (4 frames)
-    for (let i = 0; i < 4; i++) {
-      drawFrame(i, 0, (c) => drawGuard(c, { legOffset: 0 }));
+    // Rows 0-1: Dock Guard (Idle, Patrol, Alert)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 0, (c) => drawGuardBase(c, { type: 'dock', legOffset: (i / 8) * Math.PI * 2 }));
+      drawFrame(i, 1, (c) => drawGuardBase(c, { type: 'dock', alert: true, legOffset: (i / 8) * Math.PI * 2 }));
     }
-    // Row 1: Kestrel Guard Patrol Walk (6 frames)
-    for (let i = 0; i < 6; i++) {
-      drawFrame(i, 1, (c) => drawGuard(c, { legOffset: (i / 6) * Math.PI * 2 }));
+
+    // Rows 2-3: Office Guard (Idle, Patrol, Alert, Sleep)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 2, (c) => drawGuardBase(c, { type: 'office', legOffset: (i / 8) * Math.PI * 2 }));
+      drawFrame(i, 3, (c) => drawGuardBase(c, { type: 'office', alert: true, legOffset: (i / 8) * Math.PI * 2 }));
     }
-    // Row 2: Kestrel Guard Alert/Shoot (4 frames)
-    for (let i = 0; i < 4; i++) {
-      drawFrame(i, 2, (c) => drawGuard(c, { alert: true, legOffset: i % 2 }));
+
+    // Rows 4-5: Heavy Guard (Idle, Patrol, Alert with Shotgun)
+    for (let i = 0; i < 8; i++) {
+      drawFrame(i, 4, (c) => drawGuardBase(c, { type: 'heavy', legOffset: (i / 8) * Math.PI * 2 }));
+      drawFrame(i, 5, (c) => drawGuardBase(c, { type: 'heavy', alert: true, legOffset: (i / 8) * Math.PI * 2 }));
     }
-    // Row 3: Office Guard Idle / Walk (4 frames)
-    for (let i = 0; i < 4; i++) {
-      drawFrame(i, 3, (c) => drawGuard(c, { isOffice: true, legOffset: (i / 4) * Math.PI * 2 }));
-    }
-    // Row 4: Office Guard Sleeping at desk (2 frames)
-    drawFrame(0, 4, (c) => drawGuard(c, { isOffice: true, sleeping: true }));
-    drawFrame(1, 4, (c) => drawGuard(c, { isOffice: true, sleeping: true }));
-    // Row 5: Knocked out guard (1 frame)
-    drawFrame(0, 5, (c) => drawGuard(c, { knocked: true }));
-    drawFrame(1, 5, (c) => drawGuard(c, { isOffice: true, knocked: true }));
+
+    // Row 6: Knocked Out States
+    drawFrame(0, 6, (c) => drawGuardBase(c, { type: 'dock', knocked: true }));
+    drawFrame(1, 6, (c) => drawGuardBase(c, { type: 'office', knocked: true }));
+    drawFrame(2, 6, (c) => drawGuardBase(c, { type: 'heavy', knocked: true }));
 
     if (tm.exists('guard')) tm.remove('guard');
     scene.textures.addSpriteSheet('guard', canvas, {
@@ -481,9 +498,9 @@ export class AssetGenerator {
     });
   }
 
-  // ==========================================
-  // TILESET (16x16 tiles in a grid)
-  // ==========================================
+  // =========================================================================
+  // RICH TEXTURED 16x16 TILESET (No flat colors — bevels, rivets, rust, grain)
+  // =========================================================================
   static createTileset(scene) {
     const tm = scene.textures;
     const ts = 16;
@@ -500,183 +517,181 @@ export class AssetGenerator {
       ctx.restore();
     };
 
-    // 0: Empty
-    // 1: Dark industrial metal block
+    // Tile 1: Industrial Dark Steel Block (Rivet borders, grime & beveled edge)
     drawTile(1, (c) => {
-      c.fillStyle = '#141a24';
+      c.fillStyle = '#0c1017';
       c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#222b3a';
+      c.fillStyle = '#1c2432';
       c.fillRect(1, 1, ts - 2, ts - 2);
-      c.fillStyle = '#2d3748';
+      c.fillStyle = '#2d3b50';
       c.fillRect(1, 1, ts - 2, 1);
       c.fillRect(1, 1, 1, ts - 2);
-      // rivets
-      c.fillStyle = '#4a5568';
+      c.fillStyle = '#0a0e14';
+      c.fillRect(1, ts - 2, ts - 2, 1);
+      c.fillRect(ts - 2, 1, 1, ts - 2);
+      // Steel rivets
+      c.fillStyle = '#64748b';
       c.fillRect(2, 2, 2, 2);
       c.fillRect(12, 2, 2, 2);
       c.fillRect(2, 12, 2, 2);
       c.fillRect(12, 12, 2, 2);
     });
 
-    // 2: Platform with hazard yellow/black stripes
+    // Tile 2: Hazard Yellow/Black Stripe Edge (Chipped paint & scuffs)
     drawTile(2, (c) => {
-      c.fillStyle = '#2b3445';
+      c.fillStyle = '#1e2634';
       c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#1a202c';
-      c.fillRect(0, 0, ts, 4);
-      // stripes
-      for (let x = 0; x < ts; x += 4) {
+      for (let x = -4; x < ts + 4; x += 6) {
         c.fillStyle = '#d97706';
-        c.fillRect(x, 1, 2, 3);
-        c.fillStyle = '#111827';
-        c.fillRect(x + 2, 1, 2, 3);
+        c.beginPath();
+        c.moveTo(x, 5);
+        c.lineTo(x + 3, 1);
+        c.lineTo(x + 5, 1);
+        c.lineTo(x + 2, 5);
+        c.fill();
+        c.fillStyle = '#090d14';
+        c.beginPath();
+        c.moveTo(x + 2, 5);
+        c.lineTo(x + 5, 1);
+        c.lineTo(x + 7, 1);
+        c.lineTo(x + 4, 5);
+        c.fill();
       }
       c.fillStyle = '#475569';
-      c.fillRect(0, 4, ts, 1);
+      c.fillRect(0, 5, ts, 1);
+      c.fillStyle = '#111827';
+      c.fillRect(0, 0, ts, 1);
     });
 
-    // 3: Metal catwalk (one-way platform)
+    // Tile 3: Steel Catwalk (One-way diamond truss grate)
     drawTile(3, (c) => {
-      c.fillStyle = '#475569';
-      c.fillRect(0, 0, ts, 3);
+      c.fillStyle = '#334155';
+      c.fillRect(0, 0, ts, 4);
       c.fillStyle = '#94a3b8';
-      c.fillRect(0, 0, ts, 1);
-      // grate perforations
-      c.fillStyle = '#1e293b';
+      c.fillRect(0, 0, ts, 1); // metallic sheen
+      // Diamond perforations
+      c.fillStyle = '#0f172a';
       for (let x = 1; x < ts; x += 3) {
         c.fillRect(x, 1, 2, 2);
       }
+      // Steel truss support beam underneath
+      c.fillStyle = '#1e293b';
+      c.fillRect(2, 4, 2, 12);
+      c.fillRect(12, 4, 2, 12);
     });
 
-    // 4: Ladder
+    // Tile 4: Ladder (Riveted steel rungs)
     drawTile(4, (c) => {
-      c.fillStyle = '#475569';
-      c.fillRect(2, 0, 2, ts); // left upright
-      c.fillRect(12, 0, 2, ts); // right upright
-      c.fillStyle = '#94a3b8';
-      c.fillRect(2, 4, 12, 2); // rungs
+      c.fillStyle = '#334155';
+      c.fillRect(1, 0, 3, ts); // left stringer
+      c.fillRect(12, 0, 3, ts); // right stringer
+      c.fillStyle = '#64748b';
+      c.fillRect(2, 0, 1, ts);
+      c.fillRect(13, 0, 1, ts);
+      // Rungs
+      c.fillStyle = '#cbd5e1';
+      c.fillRect(2, 4, 12, 2);
       c.fillRect(2, 11, 12, 2);
     });
 
-    // 5: Overhead pipe (for pipe hang & hand-over-hand)
+    // Tile 5: Overhead Pipe (Coupling collars for pipe-hang)
     drawTile(5, (c) => {
-      c.fillStyle = '#334155';
-      c.fillRect(0, 2, ts, 6);
-      c.fillStyle = '#64748b';
-      c.fillRect(0, 3, ts, 2); // metallic highlight
       c.fillStyle = '#1e293b';
-      c.fillRect(0, 7, ts, 1);
-      // collar / coupling
+      c.fillRect(0, 2, ts, 7);
+      c.fillStyle = '#475569';
+      c.fillRect(0, 3, ts, 5);
       c.fillStyle = '#94a3b8';
-      c.fillRect(6, 1, 4, 8);
-    });
-
-    // 6: Ledge grab edge corner (left)
-    drawTile(6, (c) => {
-      c.fillStyle = '#2b3445';
-      c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#38bdf8'; // subtle tactical highlight
-      c.fillRect(0, 0, 3, 3);
-      c.fillStyle = '#d97706';
-      c.fillRect(3, 0, ts - 3, 3);
-    });
-
-    // 7: Ledge grab edge corner (right)
-    drawTile(7, (c) => {
-      c.fillStyle = '#2b3445';
-      c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#38bdf8';
-      c.fillRect(ts - 3, 0, 3, 3);
-      c.fillStyle = '#d97706';
-      c.fillRect(0, 0, ts - 3, 3);
-    });
-
-    // 8: Wet harbour pier (concrete / wet reflection)
-    drawTile(8, (c) => {
-      c.fillStyle = '#1e293b';
-      c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#334155';
-      c.fillRect(0, 0, ts, 2);
-      // puddles
-      c.fillStyle = '#38bdf8';
-      c.fillRect(3, 1, 4, 1);
-      c.fillRect(10, 1, 3, 1);
-    });
-
-    // 9: Water surface (deadly pit, respawns player)
-    drawTile(9, (c) => {
-      c.fillStyle = '#082f49';
-      c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#0ea5e9';
-      c.fillRect(0, 2, ts, 2);
-      c.fillStyle = '#38bdf8';
-      c.fillRect(2, 3, 4, 1);
-      c.fillRect(9, 2, 5, 1);
-    });
-
-    // 10: Office floor tiles (beige-grey carpet)
-    drawTile(10, (c) => {
-      c.fillStyle = '#252e3d';
-      c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#374357';
-      c.fillRect(0, 0, ts, 2);
-      c.fillStyle = '#1c2430';
-      c.fillRect(0, 0, 1, ts);
-    });
-
-    // 11: Office wall / framed blueprint
-    drawTile(11, (c) => {
-      c.fillStyle = '#1a222f';
-      c.fillRect(0, 0, ts, ts);
-      // framed technical picture
+      c.fillRect(0, 4, ts, 2); // metallic highlight
+      // Heavy flange coupling
+      c.fillStyle = '#cbd5e1';
+      c.fillRect(6, 1, 4, 9);
       c.fillStyle = '#0f172a';
-      c.fillRect(2, 2, 12, 10);
-      c.fillStyle = '#0284c7';
-      c.fillRect(3, 3, 10, 8);
-      c.fillStyle = '#bae6fd';
-      c.fillRect(4, 5, 8, 1);
-      c.fillRect(6, 7, 5, 1);
+      c.fillRect(7, 2, 2, 2); // bolt
+      c.fillRect(7, 6, 2, 2);
     });
 
-    // 12: Vent duct tile (tight crawlspace)
+    // Tile 8: Wet Dock Wooden Pier Planks (Wood grain & wet glint)
+    drawTile(8, (c) => {
+      c.fillStyle = '#1a1815';
+      c.fillRect(0, 0, ts, ts);
+      c.fillStyle = '#3b2f22';
+      c.fillRect(0, 0, ts, ts - 1);
+      c.fillStyle = '#544331';
+      c.fillRect(0, 1, ts, 3);
+      // Nail heads
+      c.fillStyle = '#0f172a';
+      c.fillRect(2, 2, 1, 1);
+      c.fillRect(13, 2, 1, 1);
+      // Water puddle gloss reflection
+      c.fillStyle = '#38bdf8';
+      c.fillRect(5, 1, 6, 1);
+    });
+
+    // Tile 9: Ocean Water with Animated Waves
+    drawTile(9, (c) => {
+      c.fillStyle = '#041d33';
+      c.fillRect(0, 0, ts, ts);
+      c.fillStyle = '#0284c7';
+      c.fillRect(0, 2, ts, 3);
+      c.fillStyle = '#38bdf8';
+      c.fillRect(2, 2, 5, 1);
+      c.fillRect(9, 3, 6, 1);
+      c.fillStyle = '#e0f2fe';
+      c.fillRect(4, 2, 2, 1); // sea foam crest
+    });
+
+    // Tile 10: Polished Office Hardwood Floor (Glossy reflection)
+    drawTile(10, (c) => {
+      c.fillStyle = '#20160e';
+      c.fillRect(0, 0, ts, ts);
+      c.fillStyle = '#422d1d';
+      c.fillRect(0, 0, ts, ts - 1);
+      c.fillStyle = '#61432b';
+      c.fillRect(0, 1, ts, 4);
+      // Window reflection stripe
+      c.fillStyle = 'rgba(56, 189, 248, 0.15)';
+      c.fillRect(4, 0, 8, ts);
+    });
+
+    // Tile 11: Office Wallpaper & Mahogany Wainscoting
+    drawTile(11, (c) => {
+      c.fillStyle = '#19202c';
+      c.fillRect(0, 0, ts, 10); // upper wall
+      c.fillStyle = '#352115';
+      c.fillRect(0, 10, ts, 6); // mahogany wainscoting
+      c.fillStyle = '#543622';
+      c.fillRect(0, 10, ts, 1); // moulding trim
+      // Framed picture miniature
+      c.fillStyle = '#0f172a';
+      c.fillRect(3, 2, 10, 6);
+      c.fillStyle = '#0284c7';
+      c.fillRect(4, 3, 8, 4);
+    });
+
+    // Tile 12: Vent Duct Shaft (Tight corrugated metal)
     drawTile(12, (c) => {
-      c.fillStyle = '#090d14';
+      c.fillStyle = '#080c14';
       c.fillRect(0, 0, ts, ts);
       c.fillStyle = '#1e293b';
       c.fillRect(0, 0, ts, 2);
       c.fillRect(0, ts - 2, ts, 2);
-      // vent ribs
       c.fillStyle = '#334155';
-      for (let x = 2; x < ts; x += 4) {
+      for (let x = 2; x < ts; x += 3) {
         c.fillRect(x, 2, 1, ts - 4);
       }
     });
 
-    // 13: Rooftop gravel / brick wall
+    // Tile 13: Concrete Roof with Puddle Reflections
     drawTile(13, (c) => {
-      c.fillStyle = '#18202c';
+      c.fillStyle = '#161d27';
       c.fillRect(0, 0, ts, ts);
-      c.fillStyle = '#0f141d';
-      c.fillRect(0, 4, ts, 1);
-      c.fillRect(0, 9, ts, 1);
-      c.fillRect(0, 14, ts, 1);
-      c.fillRect(7, 0, 1, 4);
-      c.fillRect(3, 5, 1, 4);
-      c.fillRect(11, 10, 1, 4);
-    });
-
-    // 14: Dark Shadow Zone tile (for visually cueing shadows)
-    drawTile(14, (c) => {
-      c.fillStyle = '#030508';
-      c.fillRect(0, 0, ts, ts);
-    });
-
-    // 15: Railing
-    drawTile(15, (c) => {
-      c.fillStyle = '#64748b';
-      c.fillRect(0, 3, ts, 2); // rail
-      c.fillRect(2, 5, 2, 11); // upright post
-      c.fillRect(12, 5, 2, 11);
+      c.fillStyle = '#222d3d';
+      c.fillRect(0, 0, ts, 2);
+      // Puddle
+      c.fillStyle = '#0f172a';
+      c.fillRect(3, 3, 10, 4);
+      c.fillStyle = '#f59e0b';
+      c.fillRect(5, 4, 4, 1); // sodium light puddle glint
     });
 
     if (tm.exists('tiles')) tm.remove('tiles');
@@ -686,499 +701,517 @@ export class AssetGenerator {
     });
   }
 
-  // ==========================================
-  // ENTITIES (Camera, Laser, Lamps, Terminal, Door, Vents, Zipline)
-  // ==========================================
+  // =========================================================================
+  // WEAPONS & GADGET HUD ICONS
+  // =========================================================================
+  static createWeaponsAndGadgetsTextures(scene) {
+    const tm = scene.textures;
+
+    // Silenced Pistol (28x18)
+    {
+      const { canvas, ctx } = this.makeCanvas(28, 18);
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(2, 4, 10, 5); // slide
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(12, 4, 14, 4); // suppressor tube
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(2, 4, 24, 1); // specular rim
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(4, 9, 5, 8); // grip
+      if (tm.exists('icon_pistol')) tm.remove('icon_pistol');
+      scene.textures.addCanvas('icon_pistol', canvas);
+    }
+
+    // Suppressed SMG (32x18)
+    {
+      const { canvas, ctx } = this.makeCanvas(32, 18);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(4, 4, 14, 6);
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(18, 5, 12, 4); // barrel/suppressor
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(8, 10, 3, 7); // curved magazine
+      ctx.fillRect(4, 10, 4, 6); // rear grip
+      if (tm.exists('icon_smg')) tm.remove('icon_smg');
+      scene.textures.addCanvas('icon_smg', canvas);
+    }
+
+    // Heavy Shotgun (34x18)
+    {
+      const { canvas, ctx } = this.makeCanvas(34, 18);
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(2, 4, 28, 4); // twin barrel
+      ctx.fillStyle = '#8a5b3a';
+      ctx.fillRect(14, 8, 8, 4); // wood pump fore-end
+      ctx.fillRect(2, 7, 7, 7); // wood stock
+      if (tm.exists('icon_shotgun')) tm.remove('icon_shotgun');
+      scene.textures.addCanvas('icon_shotgun', canvas);
+    }
+
+    // Stun Taser Icon (20x16)
+    {
+      const { canvas, ctx } = this.makeCanvas(20, 16);
+      ctx.fillStyle = '#0e7490';
+      ctx.fillRect(2, 3, 14, 7);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(16, 4, 3, 5); // prongs
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(4, 10, 4, 5);
+      if (tm.exists('icon_taser')) tm.remove('icon_taser');
+      scene.textures.addCanvas('icon_taser', canvas);
+    }
+
+    // Noise Maker Lure Icon (20x16)
+    {
+      const { canvas, ctx } = this.makeCanvas(20, 16);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(4, 3, 12, 10);
+      ctx.fillStyle = '#22d3ee';
+      ctx.beginPath();
+      ctx.arc(10, 8, 3, 0, Math.PI * 2);
+      ctx.fill();
+      if (tm.exists('icon_noisemaker')) tm.remove('icon_noisemaker');
+      scene.textures.addCanvas('icon_noisemaker', canvas);
+    }
+  }
+
+  // =========================================================================
+  // ENVIRONMENT PROPS (AC Fans, Shipping Containers, Terminals, Cameras)
+  // =========================================================================
   static createEntitiesTextures(scene) {
     const tm = scene.textures;
 
-    // 1. Security Camera (24x16)
+    // 1. Animated Rooftop AC Fan (32x28, 4 frames)
     {
-      const { canvas, ctx } = this.makeCanvas(24, 16);
-      // Mount bracket
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(0, 0, 6, 8);
-      // Camera body
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(4, 4, 14, 8);
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillRect(4, 4, 14, 2);
-      // Red blinking lens
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(16, 6, 4, 4);
-      ctx.fillStyle = '#fca5a5';
-      ctx.fillRect(17, 7, 2, 2);
+      const { canvas, ctx } = this.makeCanvas(32 * 4, 28);
+      for (let f = 0; f < 4; f++) {
+        ctx.save();
+        ctx.translate(f * 32, 0);
+        // Beveled metal enclosure
+        ctx.fillStyle = '#1a222e';
+        ctx.fillRect(0, 0, 32, 28);
+        ctx.fillStyle = '#283547';
+        ctx.fillRect(2, 2, 28, 24);
+        // Circular grill
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(6, 4, 20, 20);
+        // Rotating fan blades
+        ctx.save();
+        ctx.translate(16, 14);
+        ctx.rotate((f * Math.PI) / 4);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(-8, -2, 16, 4);
+        ctx.fillRect(-2, -8, 4, 16);
+        ctx.restore();
+        ctx.restore();
+      }
+      if (tm.exists('ac_fan')) tm.remove('ac_fan');
+      scene.textures.addSpriteSheet('ac_fan', canvas, { frameWidth: 32, frameHeight: 28 });
+    }
 
+    // 2. High-Tech Security Camera (28x18)
+    {
+      const { canvas, ctx } = this.makeCanvas(28, 18);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, 8, 10); // mount
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(6, 4, 16, 10); // chassis
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(6, 4, 16, 2);
+      // Lens & LED
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(18, 7, 5, 5);
+      ctx.fillStyle = '#fca5a5';
+      ctx.fillRect(19, 8, 2, 2);
       if (tm.exists('camera')) tm.remove('camera');
       scene.textures.addCanvas('camera', canvas);
     }
 
-    // 2. Rooftop Sodium Lamp Post (16x32)
+    // 3. Stenciled Kestrel Dynamics Cargo Crate (28x28)
     {
-      const { canvas, ctx } = this.makeCanvas(16, 32);
-      // Post
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(7, 6, 2, 26);
-      // Lamp head
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(2, 2, 12, 4);
-      // Bulb
+      const { canvas, ctx } = this.makeCanvas(28, 28);
+      ctx.fillStyle = '#1a202c';
+      ctx.fillRect(0, 0, 28, 28);
+      ctx.fillStyle = '#374151';
+      ctx.fillRect(2, 2, 24, 24);
+      // Steel cross bracing
+      ctx.strokeStyle = '#4b5563';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(3, 3);
+      ctx.lineTo(25, 25);
+      ctx.moveTo(25, 3);
+      ctx.lineTo(3, 25);
+      ctx.stroke();
+      // Original company stencil: "KESTREL"
       ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(4, 6, 8, 3);
-      ctx.fillStyle = '#fef08a';
-      ctx.fillRect(6, 6, 4, 2);
-
-      if (tm.exists('lamp_post')) tm.remove('lamp_post');
-      scene.textures.addCanvas('lamp_post', canvas);
+      ctx.fillRect(6, 11, 16, 5);
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(8, 12, 12, 3);
+      if (tm.exists('crate')) tm.remove('crate');
+      scene.textures.addCanvas('crate', canvas);
     }
 
-    // 3. Popped / Broken Lamp (16x32)
-    {
-      const { canvas, ctx } = this.makeCanvas(16, 32);
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(7, 6, 2, 26);
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(2, 2, 12, 4);
-      // Broken shattered bulb
+    // 4. Corrugated Shipping Container (48x32, 3 colors: rust orange, ocean teal, crimson)
+    const containerColors = [
+      { key: 'container_rust', base: '#7c2d12', dark: '#431407', light: '#c2410c' },
+      { key: 'container_teal', base: '#0e7490', dark: '#164e63', light: '#06b6d4' },
+      { key: 'container_navy', base: '#1e3a8a', dark: '#172554', light: '#2563eb' }
+    ];
+
+    containerColors.forEach(cDef => {
+      const { canvas, ctx } = this.makeCanvas(48, 32);
+      ctx.fillStyle = cDef.dark;
+      ctx.fillRect(0, 0, 48, 32);
+      ctx.fillStyle = cDef.base;
+      ctx.fillRect(2, 2, 44, 28);
+      // Corrugation ribs
+      for (let x = 4; x < 44; x += 4) {
+        ctx.fillStyle = cDef.light;
+        ctx.fillRect(x, 2, 2, 28);
+        ctx.fillStyle = cDef.dark;
+        ctx.fillRect(x + 2, 2, 2, 28);
+      }
+      // Corner cast iron locks
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(5, 6, 6, 2);
+      ctx.fillRect(2, 2, 4, 4);
+      ctx.fillRect(42, 2, 4, 4);
+      ctx.fillRect(2, 26, 4, 4);
+      ctx.fillRect(42, 26, 4, 4);
+      if (tm.exists(cDef.key)) tm.remove(cDef.key);
+      scene.textures.addCanvas(cDef.key, canvas);
+    });
 
-      if (tm.exists('lamp_post_broken')) tm.remove('lamp_post_broken');
-      scene.textures.addCanvas('lamp_post_broken', canvas);
+    // 5. Water Tank (36x54)
+    {
+      const { canvas, ctx } = this.makeCanvas(36, 54);
+      // Support struts
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(6, 32, 4, 22);
+      ctx.fillRect(26, 32, 4, 22);
+      ctx.fillRect(6, 42, 24, 2);
+      // Cylinder with rivets
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(2, 8, 32, 24);
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(2, 8, 32, 4);
+      // Roof conical top
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.moveTo(18, 0);
+      ctx.lineTo(2, 8);
+      ctx.lineTo(34, 8);
+      ctx.closePath();
+      ctx.fill();
+      if (tm.exists('water_tank')) tm.remove('water_tank');
+      scene.textures.addCanvas('water_tank', canvas);
     }
 
-    // 4. Security Terminal (24x24)
+    // 6. Security Terminal (28x28)
     {
-      const { canvas, ctx } = this.makeCanvas(24, 24);
-      // Desk/stand
+      const { canvas, ctx } = this.makeCanvas(28, 28);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(2, 16, 24, 12);
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(2, 14, 20, 10);
-      // Monitor bezel
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(4, 2, 16, 12);
-      // Green/cyan glowing CRT screen
-      ctx.fillStyle = '#0e7490';
-      ctx.fillRect(6, 4, 12, 8);
+      ctx.fillRect(4, 2, 20, 15);
+      // Glowing CRT screen
+      ctx.fillStyle = '#083344';
+      ctx.fillRect(6, 4, 16, 11);
       ctx.fillStyle = '#22d3ee';
-      ctx.fillRect(7, 5, 8, 2);
-      ctx.fillRect(7, 8, 5, 2);
-
+      ctx.fillRect(8, 6, 10, 2);
+      ctx.fillRect(8, 9, 6, 2);
       if (tm.exists('terminal')) tm.remove('terminal');
       scene.textures.addCanvas('terminal', canvas);
     }
 
-    // 5. Door & Hand-Scanner (16x32)
+    // 7. Doors, Floor Vent, Zipline Handle, Laser Emitter, Collectibles
     {
-      const { canvas, ctx } = this.makeCanvas(16, 32);
-      // Steel door frame
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, 16, 32);
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(2, 2, 12, 28);
-      // Scanner biometric hand pad
-      ctx.fillStyle = '#ef4444'; // locked red
-      ctx.fillRect(10, 14, 3, 4);
-      ctx.fillStyle = '#f87171';
-      ctx.fillRect(11, 15, 1, 2);
-
+      // Steel Door (18x36)
+      const { canvas: cd, ctx: ctxd } = this.makeCanvas(18, 36);
+      ctxd.fillStyle = '#090d14';
+      ctxd.fillRect(0, 0, 18, 36);
+      ctxd.fillStyle = '#1e293b';
+      ctxd.fillRect(2, 2, 14, 32);
+      ctxd.fillStyle = '#ef4444'; // locked biometric pad
+      ctxd.fillRect(11, 16, 4, 5);
       if (tm.exists('door_locked')) tm.remove('door_locked');
-      scene.textures.addCanvas('door_locked', canvas);
+      scene.textures.addCanvas('door_locked', cd);
 
-      // Unlocked version
-      const { canvas: cOpen, ctx: ctxOpen } = this.makeCanvas(16, 32);
-      ctxOpen.fillStyle = '#0f172a';
-      ctxOpen.fillRect(0, 0, 16, 32);
-      ctxOpen.fillStyle = '#065f46';
-      ctxOpen.fillRect(2, 2, 4, 28); // slide open
-      ctxOpen.fillStyle = '#22c55e'; // unlocked green
-      ctxOpen.fillRect(10, 14, 3, 4);
-
+      const { canvas: cdu, ctx: ctxdu } = this.makeCanvas(18, 36);
+      ctxdu.fillStyle = '#090d14';
+      ctxdu.fillRect(0, 0, 18, 36);
+      ctxdu.fillStyle = '#065f46';
+      ctxdu.fillRect(2, 2, 6, 32);
+      ctxdu.fillStyle = '#22c55e'; // unlocked
+      ctxdu.fillRect(11, 16, 4, 5);
       if (tm.exists('door_unlocked')) tm.remove('door_unlocked');
-      scene.textures.addCanvas('door_unlocked', canvas);
-    }
+      scene.textures.addCanvas('door_unlocked', cdu);
 
-    // 6. Floor Vent (16x16)
-    {
-      const { canvas, ctx } = this.makeCanvas(16, 16);
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, 10, 16, 6);
-      // Vent grate slats
-      ctx.fillStyle = '#475569';
-      for (let x = 2; x < 14; x += 3) {
-        ctx.fillRect(x, 11, 1, 4);
-      }
-
+      // Floor vent (16x16)
+      const { canvas: cv, ctx: ctxv } = this.makeCanvas(16, 16);
+      ctxv.fillStyle = '#111827';
+      ctxv.fillRect(0, 8, 16, 8);
+      ctxv.fillStyle = '#475569';
+      for (let x = 2; x < 14; x += 3) ctxv.fillRect(x, 9, 1, 6);
       if (tm.exists('floor_vent')) tm.remove('floor_vent');
-      scene.textures.addCanvas('floor_vent', canvas);
-    }
+      scene.textures.addCanvas('floor_vent', cv);
 
-    // 7. Zip Line Pulley Handle & Cable Anchor (16x16)
-    {
-      const { canvas, ctx } = this.makeCanvas(16, 16);
-      // Pulley wheel
-      ctx.fillStyle = '#94a3b8';
-      ctx.beginPath();
-      ctx.arc(8, 4, 3, 0, Math.PI * 2);
-      ctx.fill();
-      // Handle bar
-      ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(3, 8, 10, 3);
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(7, 5, 2, 4);
-
+      // Zipline handle (16x16)
+      const { canvas: cz, ctx: ctxz } = this.makeCanvas(16, 16);
+      ctxz.fillStyle = '#cbd5e1';
+      ctxz.beginPath();
+      ctxz.arc(8, 4, 3.5, 0, Math.PI * 2);
+      ctxz.fill();
+      ctxz.fillStyle = '#f59e0b';
+      ctxz.fillRect(3, 8, 10, 4);
       if (tm.exists('zipline_handle')) tm.remove('zipline_handle');
-      scene.textures.addCanvas('zipline_handle', canvas);
-    }
+      scene.textures.addCanvas('zipline_handle', cz);
 
-    // 8. Laser Emitter (8x16)
-    {
-      const { canvas, ctx } = this.makeCanvas(8, 16);
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, 3, 6, 10);
-      ctx.fillStyle = '#ff0033';
-      ctx.fillRect(6, 6, 2, 4);
-
+      // Laser emitter (8x16)
+      const { canvas: cl, ctx: ctxl } = this.makeCanvas(8, 16);
+      ctxl.fillStyle = '#1e293b';
+      ctxl.fillRect(0, 2, 6, 12);
+      ctxl.fillStyle = '#ef4444';
+      ctxl.fillRect(6, 6, 2, 4);
       if (tm.exists('laser_emitter')) tm.remove('laser_emitter');
-      scene.textures.addCanvas('laser_emitter', canvas);
-    }
+      scene.textures.addCanvas('laser_emitter', cl);
 
-    // 9. Collectibles: Data Drive & Intel Folder & Ammo
-    {
       // Data Drive (16x16)
-      const { canvas, ctx } = this.makeCanvas(16, 16);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(3, 4, 10, 9);
-      ctx.fillStyle = '#06b6d4'; // Cyan military chip
-      ctx.fillRect(5, 5, 6, 7);
-      ctx.fillStyle = '#e0f2fe';
-      ctx.fillRect(6, 6, 4, 2);
-
+      const { canvas: cdd, ctx: ctxdd } = this.makeCanvas(16, 16);
+      ctxdd.fillStyle = '#0f172a';
+      ctxdd.fillRect(2, 3, 12, 10);
+      ctxdd.fillStyle = '#06b6d4';
+      ctxdd.fillRect(4, 5, 8, 7);
+      ctxdd.fillStyle = '#ffffff';
+      ctxdd.fillRect(5, 6, 6, 2);
       if (tm.exists('data_drive')) tm.remove('data_drive');
-      scene.textures.addCanvas('data_drive', canvas);
+      scene.textures.addCanvas('data_drive', cdd);
 
-      // Intel Folder (16x16)
-      const { canvas: cF, ctx: ctxF } = this.makeCanvas(16, 16);
-      ctxF.fillStyle = '#d97706'; // Manila dossier
-      ctxF.fillRect(2, 3, 12, 10);
-      ctxF.fillStyle = '#b45309';
-      ctxF.fillRect(4, 2, 4, 2); // tab
-      ctxF.fillStyle = '#ef4444'; // TOP SECRET stamp
-      ctxF.fillRect(5, 7, 6, 2);
-
+      // Intel file (16x16)
+      const { canvas: cif, ctx: ctxif } = this.makeCanvas(16, 16);
+      ctxif.fillStyle = '#d97706';
+      ctxif.fillRect(2, 3, 12, 10);
+      ctxif.fillStyle = '#ef4444';
+      ctxif.fillRect(5, 7, 6, 2); // TOP SECRET
       if (tm.exists('intel_file')) tm.remove('intel_file');
-      scene.textures.addCanvas('intel_file', cF);
+      scene.textures.addCanvas('intel_file', cif);
 
-      // Ammo Clip (16x16)
-      const { canvas: cA, ctx: ctxA } = this.makeCanvas(16, 16);
-      ctxA.fillStyle = '#334155';
-      ctxA.fillRect(4, 4, 8, 9);
-      ctxA.fillStyle = '#f59e0b';
-      ctxA.fillRect(5, 3, 2, 3);
-      ctxA.fillRect(8, 3, 2, 3);
-
+      // Ammo clip (16x16)
+      const { canvas: ca, ctx: ctxa } = this.makeCanvas(16, 16);
+      ctxa.fillStyle = '#334155';
+      ctxa.fillRect(3, 3, 10, 10);
+      ctxa.fillStyle = '#f59e0b';
+      ctxa.fillRect(4, 2, 3, 3);
+      ctxa.fillRect(8, 2, 3, 3);
       if (tm.exists('ammo_clip')) tm.remove('ammo_clip');
-      scene.textures.addCanvas('ammo_clip', cA);
-    }
+      scene.textures.addCanvas('ammo_clip', ca);
 
-    // 10. Water Tank (32x48) & AC Unit (32x24) & Crates
-    {
-      const { canvas, ctx } = this.makeCanvas(32, 48);
-      // Legs
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(4, 30, 3, 18);
-      ctx.fillRect(25, 30, 3, 18);
-      ctx.fillRect(4, 40, 24, 2);
-      // Tank cylinder
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(2, 6, 28, 24);
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(2, 6, 28, 4);
-      // Roof conical top
-      ctx.fillStyle = '#334155';
-      ctx.beginPath();
-      ctx.moveTo(16, 0);
-      ctx.lineTo(2, 6);
-      ctx.lineTo(30, 6);
-      ctx.closePath();
-      ctx.fill();
+      // Lamp Post (16x32) & Broken
+      const { canvas: clp, ctx: ctxlp } = this.makeCanvas(16, 32);
+      ctxlp.fillStyle = '#334155';
+      ctxlp.fillRect(7, 6, 2, 26);
+      ctxlp.fillStyle = '#1e293b';
+      ctxlp.fillRect(2, 2, 12, 4);
+      ctxlp.fillStyle = '#f59e0b';
+      ctxlp.fillRect(4, 6, 8, 3);
+      if (tm.exists('lamp_post')) tm.remove('lamp_post');
+      scene.textures.addCanvas('lamp_post', clp);
 
-      if (tm.exists('water_tank')) tm.remove('water_tank');
-      scene.textures.addCanvas('water_tank', canvas);
-
-      // AC Unit (32x24)
-      const { canvas: cAC, ctx: ctxAC } = this.makeCanvas(32, 24);
-      ctxAC.fillStyle = '#1e293b';
-      ctxAC.fillRect(0, 0, 32, 24);
-      ctxAC.fillStyle = '#334155';
-      ctxAC.fillRect(2, 2, 28, 20);
-      // Fan grill
-      ctxAC.strokeStyle = '#64748b';
-      ctxAC.lineWidth = 1;
-      ctxAC.strokeRect(6, 5, 12, 12);
-      ctxAC.fillStyle = '#0f172a';
-      ctxAC.fillRect(21, 5, 6, 12); // vent slats
-
-      if (tm.exists('ac_unit')) tm.remove('ac_unit');
-      scene.textures.addCanvas('ac_unit', cAC);
-
-      // Crate (24x24)
-      const { canvas: cCrate, ctx: ctxCrate } = this.makeCanvas(24, 24);
-      ctxCrate.fillStyle = '#1e293b';
-      ctxCrate.fillRect(0, 0, 24, 24);
-      ctxCrate.fillStyle = '#334155';
-      ctxCrate.fillRect(2, 2, 20, 20);
-      // Cross braces
-      ctxCrate.strokeStyle = '#475569';
-      ctxCrate.lineWidth = 2;
-      ctxCrate.beginPath();
-      ctxCrate.moveTo(3, 3);
-      ctxCrate.lineTo(21, 21);
-      ctxCrate.moveTo(21, 3);
-      ctxCrate.lineTo(3, 21);
-      ctxCrate.stroke();
-
-      if (tm.exists('crate')) tm.remove('crate');
-      scene.textures.addCanvas('crate', cCrate);
+      const { canvas: clpb, ctx: ctxlpb } = this.makeCanvas(16, 32);
+      ctxlpb.fillStyle = '#334155';
+      ctxlpb.fillRect(7, 6, 2, 26);
+      ctxlpb.fillStyle = '#1e293b';
+      ctxlpb.fillRect(2, 2, 12, 4);
+      ctxlpb.fillStyle = '#0f172a';
+      ctxlpb.fillRect(5, 6, 6, 2);
+      if (tm.exists('lamp_post_broken')) tm.remove('lamp_post_broken');
+      scene.textures.addCanvas('lamp_post_broken', clpb);
     }
   }
 
-  // ==========================================
-  // HELICOPTER (NIGHTFALL "Kite" Stealth Helicopter)
-  // ==========================================
+  // =========================================================================
+  // NIGHTFALL "KITE" STEALTH HELICOPTER (140x54)
+  // =========================================================================
   static createHelicopterTexture(scene) {
     const tm = scene.textures;
-    const { canvas, ctx } = this.makeCanvas(120, 48);
+    const { canvas, ctx } = this.makeCanvas(140, 54);
 
-    // Fuselage (stealth angular lines)
-    ctx.fillStyle = '#0b0f17';
+    // Fuselage stealth faceting
+    ctx.fillStyle = '#080c14';
     ctx.beginPath();
-    ctx.moveTo(110, 24); // nose
-    ctx.lineTo(85, 12);
-    ctx.lineTo(35, 12);
-    ctx.lineTo(5, 20); // tail boom
-    ctx.lineTo(0, 16); // tail fin
-    ctx.lineTo(4, 26);
-    ctx.lineTo(35, 28);
-    ctx.lineTo(75, 30);
+    ctx.moveTo(130, 28);
+    ctx.lineTo(100, 14);
+    ctx.lineTo(40, 14);
+    ctx.lineTo(6, 22);
+    ctx.lineTo(0, 16);
+    ctx.lineTo(5, 30);
+    ctx.lineTo(40, 32);
+    ctx.lineTo(85, 34);
     ctx.closePath();
     ctx.fill();
 
-    // Cockpit canopy (tinted dark gold/amber)
+    // Body shading
+    ctx.fillStyle = '#162030';
+    ctx.beginPath();
+    ctx.moveTo(98, 16);
+    ctx.lineTo(42, 16);
+    ctx.lineTo(42, 28);
+    ctx.lineTo(95, 28);
+    ctx.closePath();
+    ctx.fill();
+
+    // Gold tinted cockpit canopy
     ctx.fillStyle = '#b45309';
     ctx.beginPath();
-    ctx.moveTo(98, 22);
-    ctx.lineTo(85, 14);
-    ctx.lineTo(75, 14);
-    ctx.lineTo(80, 22);
+    ctx.moveTo(116, 26);
+    ctx.lineTo(100, 16);
+    ctx.lineTo(88, 16);
+    ctx.lineTo(92, 26);
     ctx.closePath();
     ctx.fill();
 
-    // Side open cargo door for rappel / rescue
-    ctx.fillStyle = '#161e2e';
-    ctx.fillRect(45, 15, 22, 14);
+    // Open troop compartment door
+    ctx.fillStyle = '#090e17';
+    ctx.fillRect(52, 18, 26, 16);
 
     // Landing skids
     ctx.fillStyle = '#475569';
-    ctx.fillRect(35, 38, 55, 3); // skid bar
-    ctx.fillRect(45, 29, 3, 9); // strut front
-    ctx.fillRect(75, 29, 3, 9); // strut back
+    ctx.fillRect(40, 44, 65, 3);
+    ctx.fillRect(52, 33, 4, 11);
+    ctx.fillRect(88, 33, 4, 11);
 
-    // Main rotor hub & blur line
+    // Spinning rotor blur line
+    ctx.fillStyle = 'rgba(226, 232, 240, 0.45)';
+    ctx.fillRect(10, 8, 120, 2);
     ctx.fillStyle = '#334155';
-    ctx.fillRect(58, 8, 5, 5);
-    ctx.fillStyle = 'rgba(203, 213, 225, 0.4)';
-    ctx.fillRect(10, 6, 100, 2); // rotor disk blur
+    ctx.fillRect(68, 10, 6, 6);
 
     if (tm.exists('helicopter')) tm.remove('helicopter');
     scene.textures.addCanvas('helicopter', canvas);
   }
 
-  // ==========================================
-  // HUD ASSETS (Original Bottom Bar, Meters, Portraits)
-  // ==========================================
+  // =========================================================================
+  // 40PX BOTTOM BAR HUD & PORTRAITS
+  // =========================================================================
   static createHUDTextures(scene) {
     const tm = scene.textures;
 
-    // 1. Vikram "Ghost" Rao Portrait (28x28)
+    // Vikram "Ghost" Rao Portrait (32x32)
     {
-      const { canvas, ctx } = this.makeCanvas(28, 28);
-      ctx.fillStyle = '#0b0f17';
-      ctx.fillRect(0, 0, 28, 28);
-      // Face
+      const { canvas, ctx } = this.makeCanvas(32, 32);
+      ctx.fillStyle = '#06090e';
+      ctx.fillRect(0, 0, 32, 32);
+      // Skin
       ctx.fillStyle = '#a16207';
-      ctx.fillRect(6, 6, 16, 18);
+      ctx.fillRect(7, 7, 18, 20);
       ctx.fillStyle = '#b45309';
-      ctx.fillRect(8, 8, 12, 12);
-      // Dark short hair
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(5, 3, 18, 6);
-      ctx.fillRect(4, 7, 3, 9);
-      // Stubble
-      ctx.fillStyle = '#78350f';
-      ctx.fillRect(8, 16, 12, 4);
-      // Amber single visor monocular (right eye)
+      ctx.fillRect(9, 9, 14, 14);
+      // Hair
+      ctx.fillStyle = '#090c10';
+      ctx.fillRect(6, 4, 20, 7);
+      // Amber visor
       ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(14, 9, 7, 5);
+      ctx.fillRect(16, 10, 8, 6);
       ctx.fillStyle = '#fef08a';
-      ctx.fillRect(16, 10, 3, 3);
-      // Tactical collar
+      ctx.fillRect(19, 11, 4, 4);
+      // Webbing collar
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(4, 21, 20, 7);
-
+      ctx.fillRect(5, 24, 22, 8);
       if (tm.exists('portrait_ghost')) tm.remove('portrait_ghost');
       scene.textures.addCanvas('portrait_ghost', canvas);
     }
 
-    // 2. Control HQ Portrait (28x28)
+    // Control HQ Portrait (32x32)
     {
-      const { canvas, ctx } = this.makeCanvas(28, 28);
-      ctx.fillStyle = '#082f49';
-      ctx.fillRect(0, 0, 28, 28);
-      // Operator face
+      const { canvas, ctx } = this.makeCanvas(32, 32);
+      ctx.fillStyle = '#051928';
+      ctx.fillRect(0, 0, 32, 32);
       ctx.fillStyle = '#f5d0b0';
-      ctx.fillRect(7, 7, 14, 15);
-      // Dark hair
+      ctx.fillRect(8, 8, 16, 18);
       ctx.fillStyle = '#1e1b4b';
-      ctx.fillRect(6, 4, 16, 5);
-      ctx.fillRect(5, 7, 4, 12);
-      // Tactical headset / boom mic
+      ctx.fillRect(6, 4, 20, 6);
+      // Tactical headset
       ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(5, 9, 3, 7); // earpiece
+      ctx.fillRect(6, 10, 4, 8);
       ctx.fillStyle = '#0284c7';
-      ctx.fillRect(7, 15, 8, 2); // mic boom
+      ctx.fillRect(8, 17, 10, 2);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(15, 14, 3, 3);
-
+      ctx.fillRect(18, 16, 4, 4);
       if (tm.exists('portrait_control')) tm.remove('portrait_control');
       scene.textures.addCanvas('portrait_control', canvas);
     }
 
-    // 3. HUD Bottom Bar Background (480x32)
+    // Bottom Bar HUD (480x40)
     {
-      const { canvas, ctx } = this.makeCanvas(480, 32);
-      ctx.fillStyle = '#070b12';
-      ctx.fillRect(0, 0, 480, 32);
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, 0, 480, 1); // top bezel line
+      const { canvas, ctx } = this.makeCanvas(480, 40);
+      ctx.fillStyle = '#060a12';
+      ctx.fillRect(0, 0, 480, 40);
+      ctx.fillStyle = '#1e2d42';
+      ctx.fillRect(0, 0, 480, 1);
       ctx.fillStyle = '#0ea5e9';
-      ctx.fillRect(0, 1, 480, 1);
-
-      // Section borders
+      ctx.fillRect(0, 1, 480, 1); // neon border
+      // Partition lines
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(130, 4, 1, 24);
-      ctx.fillRect(320, 4, 1, 24);
-
+      ctx.fillRect(145, 4, 1, 32);
+      ctx.fillRect(315, 4, 1, 32);
       if (tm.exists('hud_bar')) tm.remove('hud_bar');
       scene.textures.addCanvas('hud_bar', canvas);
     }
-
-    // 4. Silenced Pistol Icon (24x16)
-    {
-      const { canvas, ctx } = this.makeCanvas(24, 16);
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillRect(2, 4, 8, 4); // slide
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(10, 4, 12, 3); // silencer tube
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(4, 8, 4, 6); // grip
-      ctx.fillStyle = '#0ea5e9';
-      ctx.fillRect(9, 8, 2, 2); // trigger guard
-
-      if (tm.exists('icon_pistol')) tm.remove('icon_pistol');
-      scene.textures.addCanvas('icon_pistol', canvas);
-    }
-
-    // 5. Thermal Visor Icon (20x16)
-    {
-      const { canvas, ctx } = this.makeCanvas(20, 16);
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(1, 2, 18, 12);
-      ctx.fillStyle = '#f59e0b'; // Amber visor screen
-      ctx.fillRect(3, 4, 14, 8);
-      ctx.fillStyle = '#fef08a';
-      ctx.fillRect(6, 6, 8, 4);
-
-      if (tm.exists('icon_thermal')) tm.remove('icon_thermal');
-      scene.textures.addCanvas('icon_thermal', canvas);
-    }
   }
 
-  // ==========================================
-  // LIGHTING & THERMAL OVERLAYS
-  // ==========================================
+  // =========================================================================
+  // LIGHTING CONES & ADDITIVE SPRITES
+  // =========================================================================
   static createThermalTextures(scene) {
     const tm = scene.textures;
 
-    // Radial Light Glow Texture (128x128 soft circular gradient)
+    // Radial Light Glow
     {
       const { canvas, ctx } = this.makeCanvas(128, 128);
-      const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
-      grad.addColorStop(0, 'rgba(255, 235, 170, 0.85)');
-      grad.addColorStop(0.3, 'rgba(245, 158, 11, 0.45)');
-      grad.addColorStop(0.7, 'rgba(180, 83, 9, 0.15)');
+      const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+      grad.addColorStop(0, 'rgba(255, 235, 170, 0.9)');
+      grad.addColorStop(0.35, 'rgba(245, 158, 11, 0.45)');
+      grad.addColorStop(0.75, 'rgba(180, 83, 9, 0.12)');
       grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 128, 128);
-
       if (tm.exists('light_radial')) tm.remove('light_radial');
       scene.textures.addCanvas('light_radial', canvas);
     }
 
-    // Flashlight Vision Cone (160x120 arc/triangle)
+    // Flashlight Vision Cone
     {
       const { canvas, ctx } = this.makeCanvas(160, 120);
       const grad = ctx.createRadialGradient(10, 60, 5, 10, 60, 140);
       grad.addColorStop(0, 'rgba(254, 240, 138, 0.85)');
       grad.addColorStop(0.5, 'rgba(254, 240, 138, 0.35)');
       grad.addColorStop(1, 'rgba(254, 240, 138, 0)');
-
       ctx.beginPath();
       ctx.moveTo(10, 60);
       ctx.arc(10, 60, 140, -Math.PI / 6, Math.PI / 6);
       ctx.closePath();
       ctx.fillStyle = grad;
       ctx.fill();
-
       if (tm.exists('light_cone')) tm.remove('light_cone');
       scene.textures.addCanvas('light_cone', canvas);
     }
 
-    // Camera Red Cone (140x100)
+    // Camera Red Cone
     {
       const { canvas, ctx } = this.makeCanvas(140, 100);
       const grad = ctx.createRadialGradient(10, 50, 5, 10, 50, 120);
       grad.addColorStop(0, 'rgba(239, 68, 68, 0.75)');
       grad.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
       grad.addColorStop(1, 'rgba(185, 28, 28, 0)');
-
       ctx.beginPath();
       ctx.moveTo(10, 50);
       ctx.arc(10, 50, 120, -Math.PI / 7, Math.PI / 7);
       ctx.closePath();
       ctx.fillStyle = grad;
       ctx.fill();
-
       if (tm.exists('camera_cone')) tm.remove('camera_cone');
       scene.textures.addCanvas('camera_cone', canvas);
-    }
-
-    // Searchlight Blue-White Cone (240x160)
-    {
-      const { canvas, ctx } = this.makeCanvas(240, 160);
-      const grad = ctx.createRadialGradient(10, 80, 10, 10, 80, 220);
-      grad.addColorStop(0, 'rgba(224, 242, 254, 0.85)');
-      grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.3)');
-      grad.addColorStop(1, 'rgba(14, 165, 233, 0)');
-
-      ctx.beginPath();
-      ctx.moveTo(10, 80);
-      ctx.arc(10, 80, 220, -Math.PI / 5, Math.PI / 5);
-      ctx.closePath();
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      if (tm.exists('searchlight_cone')) tm.remove('searchlight_cone');
-      scene.textures.addCanvas('searchlight_cone', canvas);
     }
   }
 }

@@ -1,70 +1,86 @@
-# SILENT DESCENT — Level 1: "Iron Tide"
+# NO TRACE — Level 1: "Iron Tide"
 
-A 2D tactical stealth-action side-scroller built with **Phaser 3** and **Vite** in the style of classic 2000s Gameloft mobile spy games (e.g. *Splinter Cell* Java/Symbian editions).
+A 2D tactical stealth-action side-scroller built with **Phaser 3.87** and **Vite** in the authentic aesthetic of the finest 2000s mobile stealth-action classics (rich pixel art, moody lighting, multi-shade characters, dynamic weather, and tactical weapons systems).
 
-100% original IP, character, storyline, pixel art, procedural audio, and stealth-action mechanics.
+100% original IP, character designs, storyline, master-palette pixel art, procedural WebAudio synthesizer, and stealth-action mechanics.
 
 ---
 
 ## Story & Setting
-A rogue arms manufacturing corporation, **KESTREL DYNAMICS**, is preparing to ship a stolen next-generation guidance chip from its coastal harbour facility under the cover of a stormy night.
+A rogue military-industrial conglomerate, **KESTREL DYNAMICS**, is staging a covert midnight shipment of a next-generation guidance chip from its coastal harbour installation under heavy rain and thunderstorms.
 
-The **NIGHTFALL Unit** deploys operative **Vikram "Ghost" Rao** via stealth helicopter insertion. Ghost must infiltrate the office complex and cargo warehouse, hack the security terminal, secure the guidance chip data drive, and extract from the pier without raising alarms.
+The **NO TRACE Strategic Division** deploys operative **Vikram "Ghost" Rao** via stealth helicopter insertion into Kestrel Yard. Operative directives:
+1. Infiltrate the office facility and cargo warehouse.
+2. Hack security terminals to disable surveillance networks and unlock high-security cages.
+3. Secure the stolen Guidance Chip Data Drive.
+4. Eliminate or bypass Kestrel security personnel using silenced firearms, gadgets, or silent takedowns.
+5. Reach the stormy pier for emergency helicopter skid extraction.
 
 ---
 
-## Core Stealth Systems & Mechanics
-- **Light & Shadow System**:
-  - Dynamic light calculations from sodium lamps, moonlight window shafts, and guard flashlights.
-  - Tiles outside direct illumination are shadows.
-  - Player visibility percentage ($0\text{--}100\%$) is displayed on the bottom HUD light meter.
-  - Posture visibility multipliers: Sneak $\times 0.6$, Wall-Press $\times 0.2$, Pipe Hanging $\times 0.3$, Normal Standing $\times 1.0$.
-- **Guard Vision & AI**:
-  - $70^\circ$ vision cone with $120\text{ px}$ range (halved to $60\text{ px}$ when Ghost's visibility is $< 30\%$).
-  - Suspicion meter fills over $0.8\text{--}1.5\text{ s}$; floating indicators: `?` (suspicious inspection) $\to$ `!` (alert combat).
-  - States: **Patrol** $\to$ **Suspicious** $\to$ **Alert** $\to$ **Search** (15s sweep) $\to$ **Patrol**.
-  - Guards discover knocked-out bodies if left in lit areas; bodies can be dragged into shadows.
-- **Sound & Noise Propagation**:
-  - Running and high landings emit $80\text{ px}$ circular noise rings that alert nearby guards. Sneak walking is completely silent.
-- **Silenced Pistol**:
-  - Suppressed pistol with limited ammo ($6$ base $+$ pickups).
-  - Can shoot out sodium lamps to create dark paths and disable security cameras for 8 seconds.
-- **Extra Level 1 Mechanics**:
-  1. **Zip Line (Section A)**: Slide down steel cable from office roof to warehouse roof (hold $\uparrow$ to brake). Guards below only notice if passing through light.
-  2. **Vent Crawl (Section C)**: Floor vent shortcut leading to a tight crawlspace above the office; slow, silent, dark with inspection grates.
-  3. **Thermal Visor (V Key)**: Amber visor thermal mode for 6s ($10\text{ s}$ cooldown): screen shifts to dark blue, guards glow orange through walls, and hidden laser tripwires are revealed.
-  4. **Hack Minigame (Section C Terminal)**: 10-second pattern puzzle connecting 4 matching nodes on a $4\times 4$ grid; disables Section D cameras and marks the Data Drive. Failing twice raises alarm level by 1.
-  5. **Door Peek**: At closed doors, press $\uparrow$ to peek through the gap/viewfinder before opening.
-  6. **Helicopter Skid Hang QTE (Section F)**: During the finale extraction cutscene, Ghost hangs from the helicopter skid; press Space at the QTE prompt to pull up onto the skid.
+## Visual & Atmosphere Overhaul (Phase 1)
+- **Native Resolution & Scaling**: $480 \times 270$ native pixel resolution, integer pixel zoom, `pixelArt: true`.
+- **48–64 Master Palette**: Curated dark night blues/teals, wet steel greys, sodium lamp orange, interior mahogany beige/brown, cyan CRT monitor glow, and red alert/laser accents. 1px dark contour outlines, 3–4 shade ramps, and hand-placed highlights on all sprites.
+- **Detailed Environments by Section**:
+  - **Section A (Sky & Insertion)**: Layered night sky with parallax storm clouds, moonlight rims, distant harbour crane lights, rain streaks, and stealth helicopter insertion with rotor blur and searchlight cone.
+  - **Section B (Rooftop)**: Textured concrete roof with reflective puddles, animated AC units with spinning fan blades, water tank with shadow zone, roof ladder hatch, and security camera.
+  - **Section C (Office Interior)**: Wallpaper wainscoting panels, wall sconces casting warm light pools, overhead pipe run for hand-over-hand hanging, laser tripwires, security terminals with 10s pattern hack minigame, and crawlspace air ducts.
+  - **Section D (Cargo Warehouse)**: Industrial hazard stripes on platform edges, steel catwalks with truss supports and ladders, stacked crates with KESTREL stencils, sweeping ceiling searchlight, and Suppressed SMG weapon cache.
+  - **Section E (Dock Exterior)**: Wooden pier planking, corrugated shipping containers in multiple colors (rust, teal, navy), dock guards patrolling with flashlights, and gap hazard over ocean waters.
+  - **Section F (Extraction Finale)**: Stealth helicopter hovering with hanging rope ladder and QTE skid hang sequence.
+- **Lighting & Weather**:
+  - Dynamic darkness overlay with `ADD` blend light pools from sodium lamps, searchlights, and flashlight cones.
+  - Multi-layer heavy rain system with ledge drips, surface splashes, and periodic lightning flashes with thunder every 20–40s.
+  - Thermal Visor Mode (`V` key): Amber visor thermal mode reveals hidden lasers and illuminates guards through walls in bright thermal orange.
+- **HUD (40px Bottom Bar)**:
+  - Left: Agent pixel portrait, LIFE bar, and LIGHT meter with HIDDEN / SHADOW / ALERT status badges.
+  - Center: 3-segment SECURITY STATUS alarm panel that pulses red during alerts.
+  - Right: Active weapon icon, ammo count (`MAG / TOTAL`), tactical reload status, gadget icon with charge counts (`x3`), and thermal visor status.
+
+---
+
+## Weapons System & Arsenal (Phase 2)
+
+| Weapon | Mag / Max | Fire Type | Noise Radius | Damage | Tactical Notes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Silenced Pistol** *(start)* | 8 / 32 | Semi-auto | 40 px | 35 | Silent shots. Instant down on headshots. Shoots out lights & disables cameras for 8s. |
+| **Suppressed SMG** *(warehouse pickup)* | 24 / 96 | Full-auto (9/s) | 90 px | 18 | High rate of fire; sustained spread bloom while firing. |
+| **Tactical Shotgun** *(Heavy guard drop)* | 5 / 20 | Pump (1.1s) | 220 px | 15×6 pellets | Devastating close-range blast; screen shake, knockback, shatters crates. Loud noise raises alarm. |
+| **Stun Taser** *(gadget)* | 3 charges | Arc zap | 0 px | 6s Stun | Non-lethal electrical incapacitation within 60 px range. |
+| **Noise Maker Lure** *(gadget)* | 2 charges | Throwable | Lure ring | — | Emits audio pulses that draw suspicious guards away from patrol posts. |
+
+### Aiming & Combat Feel
+- **Aiming**: Free 360° desktop mouse aiming with thin green laser sight line, or 3-angle keyboard aiming ($\uparrow$ / $\downarrow$). On mobile: auto-aim bracket locks onto nearest guard within 160 px.
+- **Combat Effects**: Bouncing brass shell casings with gravity and angular rotation, muzzle flashes with dynamic light bursts, bullet tracers, metal sparks, wood splinters, concrete dust puffs, and bullet hole decals.
+- **Headshot Mechanics**: Upper 30% of guard hitbox deals $\times 2.5$ critical damage; Silenced Pistol headshot equals instant elimination.
+- **Cover System**: Press Down ($\downarrow$) adjacent to crates, desks, or railings to enter low cover (60% damage reduction). Pop out to shoot with Aim/Shoot.
+- **Enemy Combat AI**:
+  - **3 Guard Types**: Dock Guard (olive poncho, helmet, SMG), Office Guard (shirt, cap, pistol), Heavy Guard (ballistic armor, riot helmet, shotgun).
+  - Guards telegraph incoming fire with a red laser sight for 0.6s before firing bursts or blasts.
+  - Guards take cover behind objects, reload with a 1.5s vulnerability window, and investigate gunshot noise rings.
+  - Bodies left in lit areas trigger facility alarms if discovered by patrolling guards.
 
 ---
 
 ## Tactical Controls
 
-| Action | Keyboard | Mobile On-Screen Touch |
-| :--- | :--- | :--- |
-| **Move Left / Right** | $\leftarrow$ / $\rightarrow$ or `A` / `D` | Left / Right D-Pad |
-| **Climb / Peek / Brake** | $\uparrow$ or `W` | Up D-Pad |
-| **Crouch / Drop / Wall-Press**| $\downarrow$ or `S` | Down D-Pad |
-| **Jump** | `Space` | `JUMP` Button |
-| **Sneak** | `Shift` (hold) | `SNEAK` Button |
-| **Takedown / Interact / Hack**| `J` | `ACT` Button |
-| **Silenced Pistol** | `K` (aim with $\uparrow$/$\downarrow$) | `GUN` Button |
-| **Grab Guard** | `L` | Left Bumper / `ACT` |
-| **Thermal Visor** | `V` | `VISOR` Button |
-| **Tactical Pause** | `P` or `Esc` | Menu button |
+| Action | Desktop Keyboard / Mouse | Gamepad | Mobile Touch |
+| :--- | :--- | :--- | :--- |
+| **Move Left / Right** | `A` / `D` or $\leftarrow$ / $\rightarrow$ | D-Pad / Left Stick | `◄` / `►` D-Pad |
+| **Climb / Ladder / Brake** | `W` or $\uparrow$ | Up / Left Stick | `▲` D-Pad |
+| **Crouch Cover / Wall-Press** | `S` or $\downarrow$ | Down / Left Stick | `▼` D-Pad |
+| **Jump / Ledge Climb** | `Space` | `A` Button | `JUMP` Button |
+| **Takedown / Interact / Hack** | `J` | `X` Button | `ACT` Button |
+| **Fire Weapon** | `K` or Left Mouse Button | `R2` Trigger | `FIRE` Button |
+| **Cycle Weapon** | `Q` (prev) / `E` (next) / Mouse Wheel | `L1` / `R1` Bumpers | `SWAP` Button |
+| **Tactical Reload** | `R` | Left Stick Click | `RELOAD` Button |
+| **Deploy Gadget** | `G` | Right Stick Click | `GADGET` Button |
+| **Thermal Visor** | `V` | `Y` Button | `VISOR` Button |
+| **Pause Mission** | `P` or `Esc` | Start Button | Header Pause |
 
 ---
 
 ## Rating & Rank Criteria
-- **GHOST**: $0$ Alarms, $0$ Kills, completed under target time ($< 04:00$).
+- **GHOST**: 0 Alarms, 0 Lethal Kills, completed under target time ($< 04:00$).
 - **AGENT**: $\le 2$ Alarms, $\le 2$ Kills.
-- **ROOKIE**: Completed with higher detection or casualties.
-
----
-
-## Technical Specifications
-- Resolution: $480 \times 270$ internal pixel art, scaled up with `Phaser.Scale.FIT`, `pixelArt: true`, `roundPixels: true`.
-- Tile Size: $16\text{ px}$.
-- Audio: Pure procedural WebAudio API synthesis (zero external audio files needed).
-- Deployable to GitHub Pages with `./dist` build and `.github/workflows/deploy.yml`.
+- **ROOKIE**: Heavy alarm escalation or loud firefights.

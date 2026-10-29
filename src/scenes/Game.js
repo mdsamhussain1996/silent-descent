@@ -42,6 +42,20 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch('HUDScene');
     this.hud = this.scene.get('HUDScene');
 
+    // Setup animations
+    if (!this.anims.exists('ac_fan_spin')) {
+      this.anims.create({
+        key: 'ac_fan_spin',
+        frames: [
+          { key: 'ac_fan', frame: 0 },
+          { key: 'ac_fan', frame: 1 },
+          { key: 'ac_fan', frame: 2 }
+        ],
+        frameRate: 15,
+        repeat: -1
+      });
+    }
+
     // Build the World & Level Geometry (Sections A - F)
     this.buildLevelWorld();
 
@@ -87,6 +101,10 @@ export class GameScene extends Phaser.Scene {
     this.interactiveItems = [];
     this.sectionDCameras = [];
     this.lightsList = [];
+    this.coverObjects = [];
+    this.destructibleCrates = [];
+    this.pipeRects = [];
+    this.dockAmbushSpawned = false;
 
     // Background Parallax
     this.bgSky = this.add.graphics().setScrollFactor(0.1);
@@ -121,8 +139,9 @@ export class GameScene extends Phaser.Scene {
     this.add.image(280, 260, 'water_tank').setDepth(45);
     this.stealth.addShadowZone(255, 240, 50, 60);
 
-    // AC Unit
+    // AC Unit with spinning fan
     this.add.image(420, 288, 'ac_unit').setDepth(45);
+    this.add.sprite(420, 288, 'ac_fan', 0).play('ac_fan_spin').setDepth(46);
 
     // Rooftop Sodium Lamps
     const lamp1 = new LightSource(this, 190, 270, { radius: 90, isShootable: true });
@@ -132,8 +151,8 @@ export class GameScene extends Phaser.Scene {
     // Rooftop Security Camera above the hatch
     const camB = new SecurityCamera(this, 660, 240, { baseAngle: 120, sweepRange: 35 });
 
-    // Section B Guard patrolling rooftop
-    const guardB = new Guard(this, 500, 284, { patrolLeftX: 380, patrolRightX: 580 });
+    // Section B Guard patrolling rooftop (Dock/poncho guard with SMG)
+    const guardB = new Guard(this, 500, 284, { type: 'dock', patrolLeftX: 380, patrolRightX: 580 });
     this.guards.add(guardB);
 
     // Tutorial World Floating Prompts (Section A / B)
@@ -173,11 +192,11 @@ export class GameScene extends Phaser.Scene {
     this.laserHiddenC = new LaserTripwire(this, 1050, 460, 1050, 520, { isHidden: true });
 
     // Office Desk & Sleeping Guard (wakes up on noise)
-    const officeDeskGuard = new Guard(this, 1100, 504, { isOffice: true, isSleeping: true });
+    const officeDeskGuard = new Guard(this, 1100, 504, { type: 'office', isOffice: true, isSleeping: true });
     this.guards.add(officeDeskGuard);
 
     // Patrolling Office Guard
-    const officePatrolGuard = new Guard(this, 800, 504, { isOffice: true, patrolLeftX: 740, patrolRightX: 860 });
+    const officePatrolGuard = new Guard(this, 800, 504, { type: 'office', isOffice: true, patrolLeftX: 740, patrolRightX: 860 });
     this.guards.add(officePatrolGuard);
 
     // Biometric Hand-Scanner Door to Warehouse
@@ -231,13 +250,17 @@ export class GameScene extends Phaser.Scene {
       sweepDuration: 3500
     });
 
-    // 3 Warehouse Guards
-    const guardD1 = new Guard(this, 1550, 584, { patrolLeftX: 1480, patrolRightX: 1720 });
-    const guardD2 = new Guard(this, 1800, 704, { patrolLeftX: 1650, patrolRightX: 2050 });
-    const guardD3 = new Guard(this, 2300, 704, { patrolLeftX: 2150, patrolRightX: 2450 });
+    // 3 Warehouse Guards (including Heavy guard with shotgun)
+    const guardD1 = new Guard(this, 1550, 584, { type: 'dock', patrolLeftX: 1480, patrolRightX: 1720 });
+    const guardD2 = new Guard(this, 1800, 704, { type: 'heavy', patrolLeftX: 1650, patrolRightX: 2050 });
+    const guardD3 = new Guard(this, 2300, 704, { type: 'dock', patrolLeftX: 2150, patrolRightX: 2450 });
     this.guards.add(guardD1);
     this.guards.add(guardD2);
     this.guards.add(guardD3);
+
+    // Suppressed SMG weapon pickup on warehouse catwalk
+    const smgPickup = new CollectibleItem(this, 1600, 584, 'smg');
+    this.interactiveItems.push(smgPickup);
 
     // Section D Cameras (can be disabled permanently at Terminal C)
     const camD1 = new SecurityCamera(this, 1600, 480, { baseAngle: 75, sweepRange: 30 });
@@ -273,9 +296,14 @@ export class GameScene extends Phaser.Scene {
     // Overhead dock beams for pipe hanging under chatting guards
     this.createPipeRun(2800, 710, 220);
 
-    // 2 Dock Guards talking on the pier
-    const guardE1 = new Guard(this, 2860, 704, { patrolLeftX: 2850, patrolRightX: 2870 });
-    const guardE2 = new Guard(this, 2910, 704, { patrolLeftX: 2900, patrolRightX: 2920, facing: -1 });
+    // Shipping Containers in different colours with corrugation and rust
+    this.createContainer(2680, 704, 'container_teal');
+    this.createContainer(2744, 704, 'container_rust');
+    this.createContainer(3200, 704, 'container_navy');
+
+    // 2 Dock Guards talking on the pier (poncho, helmet, SMG)
+    const guardE1 = new Guard(this, 2860, 704, { type: 'dock', patrolLeftX: 2850, patrolRightX: 2870 });
+    const guardE2 = new Guard(this, 2910, 704, { type: 'dock', patrolLeftX: 2900, patrolRightX: 2920, facing: -1 });
     this.guards.add(guardE1);
     this.guards.add(guardE2);
 
@@ -383,14 +411,30 @@ export class GameScene extends Phaser.Scene {
       for (let c = 0; c < widthCrates; c++) {
         const crateX = x + c * cs;
         const crateY = y - r * cs;
-        this.add.image(crateX, crateY, 'crate').setDepth(35);
+        const sprite = this.add.image(crateX, crateY, 'crate').setDepth(35);
+        const col = this.add.rectangle(crateX, crateY, cs, cs);
+        this.physics.add.existing(col, true);
+        this.collisionGroup.add(col);
+        this.coverObjects.push(col);
+        this.destructibleCrates.push({
+          sprite,
+          collider: col,
+          x: crateX,
+          y: crateY,
+          hp: 40,
+          bounds: new Phaser.Geom.Rectangle(crateX - cs / 2, crateY - cs / 2, cs, cs)
+        });
       }
     }
-    const totalW = widthCrates * cs;
-    const totalH = heightCrates * cs;
-    const collider = this.add.rectangle(x + totalW / 2 - cs / 2, y - totalH / 2 + cs / 2, totalW, totalH);
-    this.physics.add.existing(collider, true);
-    this.collisionGroup.add(collider);
+  }
+
+  createContainer(x, y, textureKey) {
+    const img = this.add.image(x, y, textureKey).setDepth(34);
+    const col = this.add.rectangle(x, y, 64, 32);
+    this.physics.add.existing(col, true);
+    this.collisionGroup.add(col);
+    this.coverObjects.push(col);
+    return img;
   }
 
   addWorldPrompt(x, y, text) {
@@ -526,9 +570,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ==========================================
-  // SILENCED PISTOL BULLET HIT RAYCAST
+  // WEAPON RAYCAST & COMBAT IMPACT SYSTEM
   // ==========================================
   handleBulletHit(startX, startY, targetX, targetY) {
+    this.handleComprehensiveBulletHit(startX, startY, targetX, targetY, null, 0);
+  }
+
+  handleComprehensiveBulletHit(startX, startY, targetX, targetY, cfg, angle) {
     const line = new Phaser.Geom.Line(startX, startY, targetX, targetY);
 
     // 1. Check shootable lights
@@ -538,37 +586,123 @@ export class GameScene extends Phaser.Scene {
           const bounds = new Phaser.Geom.Rectangle(light.x - 8, light.y - 16, 16, 32);
           if (Phaser.Geom.Intersects.LineToRectangle(line, bounds)) {
             light.shootOut();
+            this.spawnImpactParticles(light.x, light.y, 'spark');
             return;
           }
         }
       }
     }
 
-    // 2. Check cameras
-    const allCams = [this.children.getByName('camB'), ...this.sectionDCameras];
+    // 2. Check security cameras
     for (const child of this.children.getChildren()) {
       if (child instanceof SecurityCamera && !child.isDisabled) {
         const bounds = new Phaser.Geom.Rectangle(child.x - 12, child.y - 8, 24, 16);
         if (Phaser.Geom.Intersects.LineToRectangle(line, bounds)) {
           child.shootDisable();
+          this.spawnImpactParticles(child.x, child.y, 'spark');
           return;
         }
       }
     }
 
-    // 3. Check guards
-    for (const guard of this.guards.getChildren()) {
-      if (!guard.isKnockedOut && !guard.isDead) {
-        const bounds = guard.getBounds();
-        if (Phaser.Geom.Intersects.LineToRectangle(line, bounds)) {
-          guard.kill();
-          this.player.guardsKilled++;
-          // Shooting a guard = alarm + 1 if another guard sees body
-          this.alarm.raise('Guard eliminated with firearm');
+    // 3. Check destructible crates
+    if (this.destructibleCrates) {
+      for (let i = this.destructibleCrates.length - 1; i >= 0; i--) {
+        const crate = this.destructibleCrates[i];
+        if (crate.bounds && Phaser.Geom.Intersects.LineToRectangle(line, crate.bounds)) {
+          const dmg = cfg ? cfg.damage : 35;
+          crate.hp -= dmg;
+          this.spawnImpactParticles(crate.x, crate.y, 'splinter');
+          if (crate.hp <= 0 || (cfg && cfg.key === 'shotgun')) {
+            this.destroyCrate(crate, i);
+          }
           return;
         }
       }
     }
+
+    // 4. Check guards
+    for (const guard of this.guards.getChildren()) {
+      if (!guard.isKnockedOut && !guard.isDead) {
+        const bounds = guard.getBounds();
+        if (Phaser.Geom.Intersects.LineToRectangle(line, bounds)) {
+          // Upper 30% calculation for headshot
+          const headshotYThreshold = bounds.y + (bounds.height * 0.30);
+          const t = Math.max(0, Math.min(1, (guard.x - startX) / (targetX - startX || 1)));
+          const hitY = startY + t * (targetY - startY);
+          const isHeadshot = hitY <= headshotYThreshold;
+
+          const dmg = cfg ? cfg.damage : 35;
+          const isPistol = !cfg || cfg.key === 'pistol';
+          guard.takeDamage(dmg, isHeadshot, isPistol);
+
+          if (guard.isDead) {
+            this.player.guardsKilled++;
+            this.alarm.raise(isHeadshot ? 'Guard eliminated with headshot' : 'Guard eliminated with firearm');
+          }
+          this.spawnImpactParticles(guard.x, hitY, 'spark');
+          return;
+        }
+      }
+    }
+
+    // 5. Environmental wall / concrete impact
+    this.spawnImpactParticles(targetX, targetY, 'concrete');
+  }
+
+  spawnImpactParticles(x, y, type) {
+    if (type === 'spark') {
+      for (let i = 0; i < 5; i++) {
+        const s = this.add.circle(x, y, Phaser.Math.Between(1, 2), 0xfef08a, 1).setDepth(210);
+        this.physics.add.existing(s);
+        s.body.setVelocity(Phaser.Math.Between(-80, 80), Phaser.Math.Between(-90, 50));
+        this.tweens.add({ targets: s, alpha: 0, duration: 250, onComplete: () => s.destroy() });
+      }
+    } else if (type === 'splinter') {
+      for (let i = 0; i < 5; i++) {
+        const s = this.add.rectangle(x, y, 3, 2, 0xa16207).setDepth(210);
+        this.physics.add.existing(s);
+        s.body.setVelocity(Phaser.Math.Between(-60, 60), Phaser.Math.Between(-100, -20));
+        this.tweens.add({ targets: s, alpha: 0, duration: 350, onComplete: () => s.destroy() });
+      }
+    } else if (type === 'concrete') {
+      const puff = this.add.circle(x, y, 3, 0x94a3b8, 0.7).setDepth(205);
+      this.tweens.add({
+        targets: puff,
+        scale: 2,
+        alpha: 0,
+        duration: 250,
+        onComplete: () => puff.destroy()
+      });
+      // Bullet hole decal that fades after 3s
+      const decal = this.add.circle(x, y, 1.5, 0x111827, 0.85).setDepth(40);
+      this.tweens.add({
+        targets: decal,
+        alpha: 0,
+        duration: 3000,
+        delay: 2000,
+        onComplete: () => decal.destroy()
+      });
+    }
+  }
+
+  destroyCrate(crate, index) {
+    for (let i = 0; i < 8; i++) {
+      const p = this.add.rectangle(
+        crate.x + Phaser.Math.Between(-8, 8),
+        crate.y + Phaser.Math.Between(-8, 8),
+        Phaser.Math.Between(3, 5),
+        Phaser.Math.Between(2, 4),
+        0xa16207
+      ).setDepth(45);
+      this.physics.add.existing(p);
+      p.body.setVelocity(Phaser.Math.Between(-100, 100), Phaser.Math.Between(-140, -30));
+      this.tweens.add({ targets: p, alpha: 0, duration: 500, onComplete: () => p.destroy() });
+    }
+    crate.sprite.destroy();
+    crate.collider.body.enable = false;
+    crate.collider.destroy();
+    this.destructibleCrates.splice(index, 1);
   }
 
   // ==========================================
@@ -582,11 +716,13 @@ export class GameScene extends Phaser.Scene {
       this.hud.setObjective('LOCKDOWN ACTIVE! ESCAPE TO DOCK FOR EXTRACTION');
     }
 
-    // Spawn 2 extra flashlight guards for Section E escape
-    const lockGuard1 = new Guard(this, 2400, 704, { patrolLeftX: 2300, patrolRightX: 2500 });
-    const lockGuard2 = new Guard(this, 2700, 704, { patrolLeftX: 2650, patrolRightX: 2750 });
+    // Warehouse lockdown with 3 response guards (1 heavy with shotgun, 2 dock SMG)
+    const lockGuard1 = new Guard(this, 2350, 704, { type: 'dock', patrolLeftX: 2200, patrolRightX: 2450 });
+    const lockGuard2 = new Guard(this, 2500, 704, { type: 'heavy', patrolLeftX: 2400, patrolRightX: 2580 });
+    const lockGuard3 = new Guard(this, 2700, 704, { type: 'dock', patrolLeftX: 2620, patrolRightX: 2780 });
     this.guards.add(lockGuard1);
     this.guards.add(lockGuard2);
+    this.guards.add(lockGuard3);
 
     // Red rotating lights effect during lockdown
     this.tweens.add({
@@ -596,6 +732,19 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1
     });
+  }
+
+  checkDockAmbush() {
+    if (this.alarm.level >= 2 && !this.dockAmbushSpawned) {
+      this.dockAmbushSpawned = true;
+      const ambushGuard1 = new Guard(this, 3050, 704, { type: 'dock', patrolLeftX: 3000, patrolRightX: 3150, facing: -1 });
+      const ambushGuard2 = new Guard(this, 3180, 704, { type: 'heavy', patrolLeftX: 3120, patrolRightX: 3250, facing: -1 });
+      this.guards.add(ambushGuard1);
+      this.guards.add(ambushGuard2);
+      if (this.hud) {
+        this.hud.setObjective('AMBUSH! WEAPONS FREE OR SLIP PAST CRATES');
+      }
+    }
   }
 
   playPierOverheardDialogue() {
@@ -733,11 +882,19 @@ export class GameScene extends Phaser.Scene {
       this.zipLineA.showPrompt(false);
     }
 
-    // Update HUD meters
+    // Check dock ambush if player reaches dock zone
+    if (this.player && this.player.x > 2800) {
+      this.checkDockAmbush();
+    }
+
+    // Update HUD meters & weapon system UI
     if (this.hud) {
       this.hud.updateTimer(this.missionTimer);
       this.hud.updateLight(this.stealth.playerVisibility);
       this.hud.updateThermal(this.player.thermalActive, this.player.thermalTimer, this.player.thermalCooldown);
+      if (this.player && this.player.weapons) {
+        this.hud.updateWeaponUI(this.player.weapons.getHUDData());
+      }
     }
 
     // Render lighting darkness overlay
